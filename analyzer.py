@@ -61,15 +61,15 @@ class TradingAnalyzer:
         # Specific symbols extracted from user screenshots
         WATCHLIST = {
             "FLAT": ["SETFGLD", "ZGOLD", "SILVERBEES", "ITC", "HCLTECH", "CAMS", "CIPLA", "BALKRISHNA"],
-            "DOWN": ["NASDQ100", "NASDQ50", "NYFANG", "CDSL", "BSE", "MCX", "HAL", "BEL", "JIOFIN", "KFINTECH", "NAUKRI", "DIVISLAB", "WAAREEENER", "WAAREERTI", "HINDCOPPER", "ANANTRAJ"],
+            "DOWN": ["NASDQ100", "NASDQ50", "NYFANG", "CDSL", "BSE", "MCX", "HAL", "BEL", "JIOFIN", "KFINTECH", "NAUKRI", "DIVISLAB", "WAAREEENER", "HINDCOPPER", "ANANTRAJ"],
             "UP": ["SETFGLD", "ZGOLD", "SILVERBEES"]
         }
         
         # Mapped common names to likely NSE symbols (Approximated)
         SYMBOLS = {
-            "FLAT": ["SETFGLD", "ZGOLD", "SILVERBEES", "ITC", "HCLTECH", "CAMS", "CIPLA", "BALKRISIND"],
-            "DOWN": ["MON100", "MONQ50", "MAFANG", "CDSL", "BSE", "MCX", "HAL", "BEL", "JIOFIN", "KFINTECH", "NAUKRI", "DIVISLAB", "WAAREEENER", "WAAREERTI", "HINDCOPPER", "ANANTRAJ"],
-            "UP": ["SETFGLD", "ZGOLD", "KOTAKSILVE"]
+            "FLAT": ["ZGOLD", "SILVERBEES", "ITC", "HCLTECH", "CAMS", "CIPLA", "BALKRISIND"],
+            "DOWN": ["MON100", "MONQ50", "MAFANG", "CDSL", "BSE", "MCX", "HAL", "BEL", "JIOFIN", "KFINTECH", "NAUKRI", "DIVISLAB", "WAAREEENER", "HINDCOPPER", "ANANTRAJ"],
+            "UP": ["ZGOLD", "KOTAKSILVE"]
         }
 
         if market_state == "FLAT":

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>beInformed - Trading Analysis Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1 class="logo">📊 beInformed</h1>
+                <p class="tagline">AI-Powered Trading Analysis & Tracking</p>
+            </div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="tab1">
+                📈 Daily Trade Calls
+            </button>
+            <button class="tab-btn" data-tab="tab2">
+                📊 Performance Tracking
+            </button>
+            <button class="tab-btn" data-tab="tab3">
+                🔍 Conviction Analysis
+            </button>
+        </nav>
+
+        <!-- Tab Content -->
+        <main class="main-content">
+            <!-- Tab 1: Daily Trade Calls -->
+            <div id="tab1" class="tab-content active">
+                <div class="tab-header">
+                    <h2>Today's Trade Recommendations</h2>
+                    <button class="btn btn-primary" id="generateCallsBtn">
+                        🔄 Generate New Calls
+                    </button>
+                </div>
+
+                <!-- Market Indicators Dashboard -->
+                <div class="indicators-grid" id="marketIndicators">
+                    <div class="indicator-card">
+                        <div class="indicator-label">Gold/Nifty Ratio</div>
+                        <div class="indicator-value" id="goldNiftyRatio">--</div>
+                        <div class="indicator-trend" id="goldNiftyTrend"></div>
+                    </div>
+                    <div class="indicator-card">
+                        <div class="indicator-label">VIX (Fear Index)</div>
+                        <div class="indicator-value" id="vixValue">--</div>
+                        <div class="indicator-trend" id="vixTrend"></div>
+                    </div>
+                    <div class="indicator-card">
+                        <div class="indicator-label">Put-Call Ratio</div>
+                        <div class="indicator-value" id="pcrValue">--</div>
+                        <div class="indicator-trend" id="pcrTrend"></div>
+                    </div>
+                    <div class="indicator-card">
+                        <div class="indicator-label">Market Sentiment</div>
+                        <div class="indicator-value" id="marketSentiment">--</div>
+                        <div class="indicator-trend" id="sentimentIcon"></div>
+                    </div>
+                </div>
+
+                <!-- Price Verification Section -->
+                <div class="tab-header" style="margin-top: 2rem;">
+                    <h3>📋 Price Verification (All Watchlist Stocks)</h3>
+                    <button class="btn btn-secondary" id="verifyPricesBtn">
+                        🔍 Fetch All Prices
+                    </button>
+                </div>
+                <div class="table-container" id="priceVerificationContainer" style="display: none;">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Yahoo Finance Symbol</th>
+                                <th>Current Price (₹)</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priceVerificationBody">
+                        </tbody>
+                    </table>
+                    <div class="pagination" id="pricePagination" style="margin-top: 1rem; text-align: center;">
+                        <button class="btn btn-sm" id="prevPage">← Previous</button>
+                        <span id="pageInfo" style="margin: 0 1rem;">Page 1</span>
+                        <button class="btn btn-sm" id="nextPage">Next →</button>
+                    </div>
+                </div>
+
+                <!-- 7-Day Trends Section -->
+                <div class="tab-header" style="margin-top: 2rem;">
+                    <h3>📊 7-Day Market Trends</h3>
+                    <button class="btn btn-secondary" id="loadTrendsBtn">
+                        📈 Load Trends
+                    </button>
+                </div>
+                <div class="trends-container" id="trendsContainer" style="display: none;">
+                    <div class="trend-chart">
+                        <h4>VIX (Fear Index)</h4>
+                        <div class="chart-bars" id="vixChart"></div>
+                    </div>
+                </div>
+
+                <!-- Trade Calls -->
+                <div class="trade-calls-container" id="tradeCallsContainer">
+                    <p class="empty-state">Click "Generate New Calls" to get AI-powered trade recommendations</p>
+                </div>
+            </div>
+
+            <!-- Tab 2: Performance Tracking -->
+            <div id="tab2" class="tab-content">
+                <div class="tab-header">
+                    <h2>Trade Performance Tracking</h2>
+                    <input type="date" id="performanceDate" class="date-input">
+                </div>
+
+                <!-- Performance Summary -->
+                <div class="performance-summary" id="performanceSummary">
+                    <div class="summary-card">
+                        <div class="summary-label">Total Calls</div>
+                        <div class="summary-value" id="totalCalls">0</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Closed Trades</div>
+                        <div class="summary-value" id="closedTrades">0</div>
+                    </div>
+                    <div class="summary-card success">
+                        <div class="summary-label">Winning Trades</div>
+                        <div class="summary-value" id="winningTrades">0</div>
+                    </div>
+                    <div class="summary-card danger">
+                        <div class="summary-label">Losing Trades</div>
+                        <div class="summary-value" id="losingTrades">0</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Avg Gain/Loss</div>
+                        <div class="summary-value" id="avgGainLoss">0%</div>
+                    </div>
+                    <div class="summary-card">
+                        <div class="summary-label">Total P&L</div>
+                        <div class="summary-value" id="totalPnl">₹0</div>
+                    </div>
+                </div>
+
+                <!-- Trades Table -->
+                <div class="table-container">
+                    <table class="trades-table">
+                        <thead>
+                            <tr>
+                                <th>Symbol</th>
+                                <th>Entry Time</th>
+                                <th>Entry Price</th>
+                                <th>Target Price</th>
+                                <th>Status</th>
+                                <th>Gain/Loss %</th>
+                                <th>P&L Amount</th>
+                                <th>Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tradesTableBody">
+                            <tr>
+                                <td colspan="8" class="empty-state">No trades for selected date</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Tab 3: Conviction Analysis -->
+            <div id="tab3" class="tab-content">
+                <div class="tab-header">
+                    <h2>Stock Conviction Analysis</h2>
+                    <div class="search-container">
+                        <input type="text" id="symbolInput" placeholder="Enter stock symbol (e.g., ITC)"
+                            class="search-input">
+                        <button class="btn btn-primary" id="analyzeBtn">🔍 Analyze</button>
+                    </div>
+                </div>
+
+                <!-- Analysis Results -->
+                <div class="analysis-container" id="analysisContainer">
+                    <p class="empty-state">Enter a stock symbol and click "Analyze" to get conviction insights</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Loading Overlay -->
+        <div class="loading-overlay" id="loadingOverlay">
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+</body>
+
+</html>
