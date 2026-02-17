@@ -10,3 +10,4 @@ urllib3<2.0
 yfinance==0.2.36
 uvicorn==0.24.0
 fastapi==0.104.1
+pdfplumber==0.11.8

@@ -1,4 +1,5 @@
 // Trading Dashboard JavaScript
+console.log('JS: Dashboard script loading...');
 
 // Utility Functions
 const showLoading = () => {
@@ -75,7 +76,7 @@ const loadMarketIndicators = async () => {
             document.getElementById('sentimentIcon').textContent = sentimentIcon;
         }
     } catch (error) {
-        console.error('Error loading market indicators:', error);
+        console.error('JS_ERROR (MarketIndicators):', error);
     }
 };
 
@@ -88,7 +89,7 @@ const loadTodaysCalls = async () => {
             displayTradeCalls(data.calls);
         }
     } catch (error) {
-        console.error('Error loading trade calls:', error);
+        console.error('JS_ERROR (TodaysCalls):', error);
     }
 };
 
@@ -164,8 +165,8 @@ document.getElementById('generateCallsBtn').addEventListener('click', async () =
             alert('Error generating calls: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to generate trade calls');
+        console.error('JS_ERROR (GenerateCalls):', error);
+        alert('Failed to generate calls');
     } finally {
         hideLoading();
     }
@@ -204,7 +205,7 @@ const loadPerformanceSummary = async (date = null) => {
             displayTradesTable(data.trades);
         }
     } catch (error) {
-        console.error('Error loading performance:', error);
+        console.error('JS_ERROR (PerformanceSummary):', error);
     } finally {
         hideLoading();
     }
@@ -266,7 +267,7 @@ const closeTrade = async (tradeId) => {
             alert('Error closing trade: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('JS_ERROR (CloseTrade):', error);
         alert('Failed to close trade');
     } finally {
         hideLoading();
@@ -283,23 +284,42 @@ document.getElementById('performanceDate').valueAsDate = new Date();
 
 // ============= TAB 3: CONVICTION ANALYSIS =============
 
+document.getElementById('uploadBtn').addEventListener('click', () => {
+    document.getElementById('transcriptFile').click();
+});
+
+document.getElementById('transcriptFile').addEventListener('change', (e) => {
+    const fileName = e.target.files[0] ? e.target.files[0].name : '';
+    if (fileName) {
+        document.getElementById('uploadBtn').textContent = `📄 ${fileName}`;
+    }
+});
+
 document.getElementById('analyzeBtn').addEventListener('click', async () => {
     const symbol = document.getElementById('symbolInput').value.trim().toUpperCase();
+    const fileInput = document.getElementById('transcriptFile');
+    const file = fileInput.files[0];
 
     if (!symbol) {
         alert('Please enter a stock symbol');
         return;
     }
 
+    if (!file) {
+        alert('Please upload a PDF transcript first');
+        return;
+    }
+
     showLoading();
 
     try {
-        const response = await fetch('/api/analyze_conviction', {
+        const formData = new FormData();
+        formData.append('symbol', symbol);
+        formData.append('file', file);
+
+        const response = await fetch('/api/analyze_transcript', {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({ symbol })
+            body: formData
         });
 
         const data = await response.json();
@@ -307,11 +327,11 @@ document.getElementById('analyzeBtn').addEventListener('click', async () => {
         if (data.success) {
             displayConvictionAnalysis(data.symbol, data.analysis);
         } else {
-            alert('Error analyzing stock: ' + data.error);
+            alert('Error analyzing transcript: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
-        alert('Failed to analyze stock');
+        console.error('JS_ERROR (AnalyzeTranscript):', error);
+        alert('Failed to analyze transcript');
     } finally {
         hideLoading();
     }
@@ -324,60 +344,203 @@ document.getElementById('symbolInput').addEventListener('keypress', (e) => {
     }
 });
 
-const displayConvictionAnalysis = (symbol, analysis) => {
+const renderBulletList = (items, emptyMsg = 'No data available') => {
+    if (!items || items.length === 0) return `<p class="rr-empty">${emptyMsg}</p>`;
+    return `<ul class="rr-list">${items.map(i => `<li>${i}</li>`).join('')}</ul>`;
+};
+
+const renderScoreBadge = (score, max = 10) => {
+    const pct = (score / max) * 100;
+    const color = pct >= 70 ? 'var(--success)' : pct >= 50 ? 'var(--warning)' : 'var(--danger)';
+    return `<span class="rr-score-badge" style="background: ${color}">${score}/${max}</span>`;
+};
+
+const renderSection = (icon, title, contentHtml, open = false) => {
+    return `
+        <details class="rr-section" ${open ? 'open' : ''}>
+            <summary class="rr-section-header">${icon} ${title}</summary>
+            <div class="rr-section-body">${contentHtml}</div>
+        </details>
+    `;
+};
+
+const displayConvictionAnalysis = (symbol, a) => {
     const container = document.getElementById('analysisContainer');
 
-    const scoreColor = analysis.overall_score > 70 ? 'var(--success)' :
-        analysis.overall_score > 50 ? 'var(--warning)' : 'var(--danger)';
+    // Conviction verdict styling
+    const verdict = a.conclusion?.verdict || 'NEUTRAL';
+    const verdictColor = verdict === 'HIGH_CONVICTION' ? 'var(--success)' :
+        verdict === 'AVOID' ? 'var(--danger)' : 'var(--warning)';
+    const verdictLabel = verdict === 'HIGH_CONVICTION' ? '🟢 High Conviction' :
+        verdict === 'AVOID' ? '🔴 Avoid' : '🟡 Neutral';
 
-    const sentimentEmoji = analysis.sentiment === 'POSITIVE' ? '😊' :
-        analysis.sentiment === 'NEGATIVE' ? '😟' : '😐';
+    const stScore = a.conviction_scores?.short_term?.score || 5;
+    const ltScore = a.conviction_scores?.long_term?.score || 5;
 
-    container.innerHTML = `
-        <div class="analysis-result">
-            <div class="analysis-header">
-                <div class="analysis-symbol">${symbol}</div>
-                <div class="conviction-score">
-                    <div class="score-circle" style="background: ${scoreColor}">
-                        ${analysis.overall_score}
-                    </div>
-                    <div class="score-label">Conviction Score</div>
-                </div>
+    let html = `<div class="research-report">`;
+
+    // ── Header ──
+    html += `
+        <div class="rr-hero">
+            <div class="rr-hero-left">
+                <h2 class="rr-symbol">${symbol}</h2>
+                <span class="rr-quarter">${a.quarter || 'Latest'}</span>
+                <span class="rr-verdict" style="background: ${verdictColor}">${verdictLabel}</span>
             </div>
-            
-            <div class="transcript-summary">
-                <h3>📄 Transcript Summary</h3>
-                <p>${analysis.transcript_summary}</p>
-            </div>
-            
-            <div class="key-insights">
-                <h3>💡 Key Insights</h3>
-                <ul class="insights-list">
-                    ${analysis.key_insights.map(insight => `<li>${insight}</li>`).join('')}
-                </ul>
-            </div>
-            
-            <div class="conviction-factors">
-                <div class="factor-item">
-                    <div class="factor-label">Revenue Growth</div>
-                    <div class="factor-value gain-positive">${analysis.revenue_growth}%</div>
+            <div class="rr-hero-scores">
+                <div class="rr-score-card">
+                    <div class="rr-score-value" style="color: ${stScore >= 7 ? 'var(--success)' : stScore >= 5 ? 'var(--warning)' : 'var(--danger)'}">${stScore}</div>
+                    <div class="rr-score-label">Short-Term</div>
                 </div>
-                <div class="factor-item">
-                    <div class="factor-label">Margin Trend</div>
-                    <div class="factor-value">${analysis.margin_trend}</div>
-                </div>
-                <div class="factor-item">
-                    <div class="factor-label">Order Book</div>
-                    <div class="factor-value">${analysis.order_book_strength}</div>
-                </div>
-                <div class="factor-item">
-                    <div class="factor-label">Sentiment</div>
-                    <div class="factor-value">${sentimentEmoji} ${analysis.sentiment}</div>
+                <div class="rr-score-card">
+                    <div class="rr-score-value" style="color: ${ltScore >= 7 ? 'var(--success)' : ltScore >= 5 ? 'var(--warning)' : 'var(--danger)'}">${ltScore}</div>
+                    <div class="rr-score-label">Long-Term</div>
                 </div>
             </div>
         </div>
     `;
+
+    // ── Conclusion ──
+    html += `<div class="rr-conclusion"><p>${a.conclusion?.summary || ''}</p></div>`;
+
+    // 1. Executive Summary
+    const execHtml = `
+        <div class="rr-meta-row">
+            <span class="rr-tag">Tone: <strong>${a.executive_summary?.tone || 'N/A'}</strong></span>
+        </div>
+        <h4>Key Takeaways</h4>
+        ${renderBulletList(a.executive_summary?.takeaways)}
+        ${a.executive_summary?.surprises?.length ? `<h4>Surprises</h4>${renderBulletList(a.executive_summary.surprises)}` : ''}
+    `;
+    html += renderSection('1️⃣', 'Executive Summary', execHtml, true);
+
+    // 2. Revenue & Growth
+    const revHtml = `
+        <div class="rr-metrics-grid">
+            <div class="rr-metric"><span class="rr-metric-label">YoY Growth</span><span class="rr-metric-value">${a.revenue_growth?.yoy_growth != null ? a.revenue_growth.yoy_growth + '%' : 'N/A'}</span></div>
+            <div class="rr-metric"><span class="rr-metric-label">QoQ Growth</span><span class="rr-metric-value">${a.revenue_growth?.qoq_growth != null ? a.revenue_growth.qoq_growth + '%' : 'N/A'}</span></div>
+            <div class="rr-metric"><span class="rr-metric-label">Sustainability</span><span class="rr-metric-value">${a.revenue_growth?.sustainability || 'N/A'}</span></div>
+        </div>
+        ${a.revenue_growth?.segment_performance?.length ? `<h4>Segment Performance</h4>${renderBulletList(a.revenue_growth.segment_performance)}` : ''}
+        ${a.revenue_growth?.geographic_performance?.length ? `<h4>Geographic Performance</h4>${renderBulletList(a.revenue_growth.geographic_performance)}` : ''}
+        ${a.revenue_growth?.volume_vs_pricing?.length ? `<h4>Volume vs Pricing</h4>${renderBulletList(a.revenue_growth.volume_vs_pricing)}` : ''}
+    `;
+    html += renderSection('2️⃣', 'Revenue & Growth Analysis', revHtml, true);
+
+    // 3. Profitability & Margins
+    const profHtml = `
+        <div class="rr-metrics-grid">
+            <div class="rr-metric"><span class="rr-metric-label">Gross Margin</span><span class="rr-metric-value">${a.profitability?.gross_margin != null ? a.profitability.gross_margin + '%' : 'N/A'}</span></div>
+            <div class="rr-metric"><span class="rr-metric-label">EBITDA Margin</span><span class="rr-metric-value">${a.profitability?.ebitda_margin != null ? a.profitability.ebitda_margin + '%' : 'N/A'}</span></div>
+            <div class="rr-metric"><span class="rr-metric-label">Net Margin</span><span class="rr-metric-value">${a.profitability?.net_margin != null ? a.profitability.net_margin + '%' : 'N/A'}</span></div>
+            <div class="rr-metric"><span class="rr-metric-label">Trend</span><span class="rr-metric-value rr-tag-${a.profitability?.trend?.toLowerCase()}">${a.profitability?.trend || 'N/A'}</span></div>
+        </div>
+        ${a.profitability?.drivers?.length ? `<h4>Margin Drivers</h4>${renderBulletList(a.profitability.drivers)}` : ''}
+    `;
+    html += renderSection('3️⃣', 'Profitability & Margins', profHtml);
+
+    // 4. Cash Flow & Capital Allocation
+    const cfHtml = `
+        ${a.cash_flow?.capex_commentary?.length ? `<h4>Capex Commentary</h4>${renderBulletList(a.cash_flow.capex_commentary)}` : ''}
+        ${a.cash_flow?.debt_commentary?.length ? `<h4>Debt & Leverage</h4>${renderBulletList(a.cash_flow.debt_commentary)}` : ''}
+        ${a.cash_flow?.shareholder_returns?.length ? `<h4>Shareholder Returns</h4>${renderBulletList(a.cash_flow.shareholder_returns)}` : ''}
+        ${a.cash_flow?.mna_activity?.length ? `<h4>M&A Activity</h4>${renderBulletList(a.cash_flow.mna_activity)}` : ''}
+    `;
+    html += renderSection('4️⃣', 'Cash Flow & Capital Allocation', cfHtml);
+
+    // 5. Balance Sheet
+    const bsHtml = `
+        ${a.balance_sheet?.liquidity?.length ? `<h4>Liquidity</h4>${renderBulletList(a.balance_sheet.liquidity)}` : ''}
+        ${a.balance_sheet?.working_capital?.length ? `<h4>Working Capital</h4>${renderBulletList(a.balance_sheet.working_capital)}` : ''}
+        ${a.balance_sheet?.red_flags?.length ? `<h4>⚠️ Red Flags</h4>${renderBulletList(a.balance_sheet.red_flags)}` : ''}
+    `;
+    html += renderSection('5️⃣', 'Balance Sheet Strength', bsHtml);
+
+    // 6. Management Commentary
+    const mgmtHtml = `
+        <div class="rr-meta-row">
+            <span class="rr-tag">Tone: <strong>${a.management_commentary?.tone || 'N/A'}</strong></span>
+            <span class="rr-tag">Guidance: <strong>${a.management_commentary?.guidance_direction || 'N/A'}</strong></span>
+        </div>
+        ${a.management_commentary?.guidance_statements?.length ? `<h4>Guidance Statements</h4>${renderBulletList(a.management_commentary.guidance_statements)}` : ''}
+    `;
+    html += renderSection('6️⃣', 'Management Commentary', mgmtHtml);
+
+    // 7. Competitive Position
+    const compHtml = `
+        ${a.competitive_position?.market_share?.length ? `<h4>Market Share</h4>${renderBulletList(a.competitive_position.market_share)}` : ''}
+        ${a.competitive_position?.pricing_power?.length ? `<h4>Pricing Power</h4>${renderBulletList(a.competitive_position.pricing_power)}` : ''}
+        ${a.competitive_position?.moat_indicators?.length ? `<h4>Moat Indicators</h4>${renderBulletList(a.competitive_position.moat_indicators)}` : ''}
+        ${a.competitive_position?.competitive_risks?.length ? `<h4>Competitive Risks</h4>${renderBulletList(a.competitive_position.competitive_risks)}` : ''}
+    `;
+    html += renderSection('7️⃣', 'Competitive Position & Moat', compHtml);
+
+    // 8. Strategic Initiatives
+    const stratHtml = `
+        ${a.strategic_initiatives?.new_ventures?.length ? `<h4>New Ventures</h4>${renderBulletList(a.strategic_initiatives.new_ventures)}` : ''}
+        ${a.strategic_initiatives?.expansion?.length ? `<h4>Expansion</h4>${renderBulletList(a.strategic_initiatives.expansion)}` : ''}
+        ${a.strategic_initiatives?.technology?.length ? `<h4>Technology & Innovation</h4>${renderBulletList(a.strategic_initiatives.technology)}` : ''}
+        ${a.strategic_initiatives?.cost_optimization?.length ? `<h4>Cost Optimization</h4>${renderBulletList(a.strategic_initiatives.cost_optimization)}` : ''}
+        ${a.strategic_initiatives?.long_term_drivers?.length ? `<h4>Long-Term Growth Drivers</h4>${renderBulletList(a.strategic_initiatives.long_term_drivers)}` : ''}
+    `;
+    html += renderSection('8️⃣', 'Strategic Initiatives & Future Plans', stratHtml);
+
+    // 9. Risks
+    const riskHtml = `
+        ${a.risks?.macro?.length ? `<h4>Macro Risks</h4>${renderBulletList(a.risks.macro)}` : ''}
+        ${a.risks?.regulatory?.length ? `<h4>Regulatory Risks</h4>${renderBulletList(a.risks.regulatory)}` : ''}
+        ${a.risks?.execution?.length ? `<h4>Execution Risks</h4>${renderBulletList(a.risks.execution)}` : ''}
+        ${a.risks?.slowdown_indicators?.length ? `<h4>Slowdown Indicators</h4>${renderBulletList(a.risks.slowdown_indicators)}` : ''}
+    `;
+    html += renderSection('9️⃣', 'Risks Identified', riskHtml);
+
+    // 10. Leading Indicators
+    const leadHtml = `
+        ${a.leading_indicators?.metrics_to_watch?.length ? `<h4>Metrics to Watch</h4>${renderBulletList(a.leading_indicators.metrics_to_watch)}` : ''}
+        ${a.leading_indicators?.acceleration_signs?.length ? `<h4>Acceleration Signs</h4>${renderBulletList(a.leading_indicators.acceleration_signs)}` : ''}
+        ${a.leading_indicators?.deterioration_signs?.length ? `<h4>Deterioration Signs</h4>${renderBulletList(a.leading_indicators.deterioration_signs)}` : ''}
+    `;
+    html += renderSection('🔟', 'Leading Indicators', leadHtml);
+
+    // Valuation Insights
+    const valHtml = `
+        ${a.valuation_insights?.growth_justification?.length ? `<h4>Growth Justification</h4>${renderBulletList(a.valuation_insights.growth_justification)}` : ''}
+        ${a.valuation_insights?.margin_trajectory?.length ? `<h4>Margin Trajectory</h4>${renderBulletList(a.valuation_insights.margin_trajectory)}` : ''}
+        ${a.valuation_insights?.cash_flow_durability?.length ? `<h4>Cash Flow Durability</h4>${renderBulletList(a.valuation_insights.cash_flow_durability)}` : ''}
+    `;
+    html += renderSection('📈', 'Valuation-Relevant Insights', valHtml);
+
+    // Conviction Score Detail
+    const convHtml = `
+        <div class="rr-conviction-detail">
+            <div class="rr-conv-card">
+                <h4>Short-Term Trade</h4>
+                ${renderScoreBadge(stScore)}
+                ${renderBulletList(a.conviction_scores?.short_term?.justification)}
+            </div>
+            <div class="rr-conv-card">
+                <h4>Long-Term Investment</h4>
+                ${renderScoreBadge(ltScore)}
+                ${renderBulletList(a.conviction_scores?.long_term?.justification)}
+            </div>
+        </div>
+    `;
+    html += renderSection('🎯', 'Conviction Score Breakdown', convHtml, true);
+
+    // Red Flags
+    if (a.red_flags?.length) {
+        html += renderSection('🚨', 'Red Flags', renderBulletList(a.red_flags), true);
+    }
+
+    // Hidden Signals
+    if (a.hidden_signals?.length) {
+        html += renderSection('🔎', 'Hidden Signals', renderBulletList(a.hidden_signals), true);
+    }
+
+    html += `</div>`; // close .research-report
+    container.innerHTML = html;
 };
+
 
 // ============= PRICE VERIFICATION =============
 
@@ -429,7 +592,7 @@ document.getElementById('verifyPricesBtn').addEventListener('click', async () =>
             alert('Error fetching prices: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('JS_ERROR (VerifyPrices):', error);
         alert('Failed to fetch prices');
     } finally {
         hideLoading();
@@ -506,7 +669,7 @@ document.getElementById('loadTrendsBtn').addEventListener('click', async () => {
             alert('Error loading trends: ' + data.error);
         }
     } catch (error) {
-        console.error('Error:', error);
+        console.error('JS_ERROR (LoadTrends):', error);
         alert('Failed to load trends');
     } finally {
         hideLoading();

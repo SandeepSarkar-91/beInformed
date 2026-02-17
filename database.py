@@ -210,13 +210,26 @@ class DatabaseManager:
         return self.session.query(MarketIndicators).filter_by(date=today).first()
     
     # Conviction Insights operations
-    def save_conviction_insights(self, symbol, transcript_summary, key_insights,
-                                conviction_factors, overall_score, sentiment="NEUTRAL",
-                                revenue_growth=0, margin_trend="STABLE", 
-                                order_book_strength="MODERATE"):
+    def save_conviction_insights(self, symbol, **analysis_data):
         """Save conviction analysis for a symbol"""
+        # Extract fields needed for individual columns (backward compat)
+        quarter = analysis_data.get('quarter')
+        transcript_summary = analysis_data.get('transcript_summary')
+        key_insights = analysis_data.get('key_insights')
+        conviction_factors = analysis_data.get('conviction_factors')
+        overall_score = analysis_data.get('overall_score', 0)
+        sentiment = analysis_data.get('sentiment', 'NEUTRAL')
+        revenue_growth = analysis_data.get('revenue_growth_val', analysis_data.get('revenue_growth', 0))
+        # if revenue_growth is the dict from the new engine, try to get the float
+        if isinstance(revenue_growth, dict):
+            revenue_growth = revenue_growth.get('yoy_growth', 0)
+            
+        margin_trend = analysis_data.get('margin_trend', 'STABLE')
+        order_book_strength = analysis_data.get('order_book_strength', 'MODERATE')
+
         insight = ConvictionInsights(
             symbol=symbol,
+            quarter=quarter,
             transcript_summary=transcript_summary,
             key_insights=key_insights,
             conviction_factors=conviction_factors,
@@ -224,7 +237,8 @@ class DatabaseManager:
             sentiment=sentiment,
             revenue_growth=revenue_growth,
             margin_trend=margin_trend,
-            order_book_strength=order_book_strength
+            order_book_strength=order_book_strength,
+            full_analysis=analysis_data # Store everything
         )
         self.session.add(insight)
         self.session.commit()
@@ -232,12 +246,25 @@ class DatabaseManager:
     
     def get_latest_conviction(self, symbol):
         """Get latest conviction analysis for a symbol"""
+        from sqlalchemy import desc
         return self.session.query(ConvictionInsights).filter_by(
             symbol=symbol
         ).order_by(desc(ConvictionInsights.analysis_date)).first()
+
+    def get_quarterly_conviction(self, symbol, quarter):
+        """Check if analysis for symbol and quarter already exists"""
+        return self.session.query(ConvictionInsights).filter_by(
+            symbol=symbol, 
+            quarter=quarter
+        ).first()
     
     def get_all_convictions(self, limit=10):
         """Get recent conviction analyses"""
+        from sqlalchemy import desc
         return self.session.query(ConvictionInsights).order_by(
             desc(ConvictionInsights.analysis_date)
         ).limit(limit).all()
+
+    def close(self):
+        """Close the session"""
+        self.session.close()

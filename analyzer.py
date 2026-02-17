@@ -1,10 +1,6 @@
-import re
-from transcripts import ScreenerScraper
-
 class TradingAnalyzer:
     def __init__(self, parser):
         self.parser = parser
-        self.scraper = ScreenerScraper()
 
     def get_market_state(self, current_nifty_change):
         """
@@ -36,26 +32,10 @@ class TradingAnalyzer:
 
     def confirm_with_qualitative_data(self, symbol):
         """
-        Fetches announcements from Screener.in and performs a basic check
-        for significant positive or negative news.
+        Qualitative check placeholder. 
+        Originally used Screener.in scraping, now disabled.
         """
-        data = self.scraper.get_company_data(symbol)
-        if not data:
-            return True, "No qualitative data found, proceeding with technical check."
-        
-        announcements = data.get("announcements", [])
-        concalls = data.get("concall_summaries", [])
-        
-        # Simple keyword matching for demo; in production, this would be an LLM call
-        negative_keywords = ["loss", "penalty", "default", "resignation", "investigation"]
-        positive_keywords = ["order", "growth", "expansion", "profit", "dividend", "bonus"]
-        
-        for ann in announcements:
-            text = ann['text'].lower()
-            if any(k in text for k in negative_keywords):
-                return False, f"Vetoed: Negative announcement found: {ann['text']}"
-            
-        return True, f"Qualitative check passed. Found {len(announcements)} announcements."
+        return True, "Qualitative check passed (Scraping disabled)."
 
     def suggest_trades(self, market_state):
         # Specific symbols extracted from user screenshots

@@ -80,6 +80,7 @@ class ConvictionInsights(Base):
     id = Column(Integer, primary_key=True)
     symbol = Column(String(50), nullable=False)
     analysis_date = Column(DateTime, default=datetime.now, nullable=False)
+    quarter = Column(String(10))  # e.g., 'Q3 FY26'
     transcript_summary = Column(Text)
     key_insights = Column(JSON)  # List of key points
     conviction_factors = Column(JSON)  # Dict with factors and scores
@@ -88,6 +89,7 @@ class ConvictionInsights(Base):
     revenue_growth = Column(Float)
     margin_trend = Column(String(20))  # EXPANDING/STABLE/CONTRACTING
     order_book_strength = Column(String(20))  # STRONG/MODERATE/WEAK
+    full_analysis = Column(JSON)  # Store the complete 15-section report
     
     def __repr__(self):
         return f"<ConvictionInsights {self.symbol} Score: {self.overall_score}>"

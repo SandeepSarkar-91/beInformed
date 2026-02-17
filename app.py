@@ -4,7 +4,7 @@ from mock_data import MockDataGenerator
 from market_data import MarketDataManager
 from analyzer import TradingAnalyzer
 from context_parser import ContextParser
-from transcripts import ScreenerScraper
+from transcripts import TranscriptAnalysisEngine
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -17,7 +17,6 @@ app.config['SECRET_KEY'] = os.getenv('FLASK_SECRET_KEY', 'dev-secret-key-change-
 # Initialize components
 parser = ContextParser()
 analyzer = TradingAnalyzer(parser)
-scraper = ScreenerScraper()
 mock_data = MockDataGenerator()
 market_data = MarketDataManager()
 
@@ -337,31 +336,61 @@ def get_performance_summary():
 
 # ============= TAB 3: CONVICTION ANALYSIS =============
 
-@app.route('/api/analyze_conviction', methods=['POST'])
-def analyze_conviction():
-    """Analyze a stock for conviction insights"""
+@app.route('/api/analyze_transcript', methods=['POST'])
+def analyze_transcript():
+    """Analyze a stock for conviction insights using uploaded PDF transcript"""
     try:
-        data = request.json
-        symbol = data.get('symbol', '').upper()
-        
-        # Generate mock conviction data
-        conviction_data = mock_data.generate_conviction_insights(symbol)
-        
-        # Save to database
+        symbol = request.form.get('symbol', '').upper()
+        if not symbol:
+            return jsonify({'success': False, 'error': "Symbol is required"}), 400
+            
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': "No file provided"}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': "No file selected"}), 400
+            
+        if not file.filename.lower().endswith('.pdf'):
+            return jsonify({'success': False, 'error': "Only PDF files are supported"}), 400
+            
         db = DatabaseManager()
+        analyzer = TranscriptAnalysisEngine()
+        
+        # Extract text from PDF
+        text = analyzer.extract_text(file)
+        if not text:
+            db.close()
+            return jsonify({'success': False, 'error': "Failed to extract text from PDF"}), 500
+            
+        # Analyze text
+        analysis_data = analyzer.analyze_transcript(symbol, text)
+        if not analysis_data:
+            db.close()
+            return jsonify({'success': False, 'error': "Failed to analyze transcript"}), 500
+            
+        quarter = analysis_data['quarter']
+        
+        # Check if we already have this quarter in DB (optional, maybe we want to allow re-analysis)
+        # existing = db.get_quarterly_conviction(symbol, quarter)
+        
+        # Save new analysis
         insight = db.save_conviction_insights(
             symbol=symbol,
-            **conviction_data
+            **analysis_data
         )
         db.close()
         
         return jsonify({
             'success': True,
             'symbol': symbol,
-            'analysis': conviction_data
+            'analysis': analysis_data,
+            'cached': False
         })
         
     except Exception as e:
+        if 'db' in locals(): db.close()
+        print(f"Error in analyze_transcript: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
@@ -374,20 +403,21 @@ def get_conviction(symbol):
         db.close()
         
         if insight:
+            analysis = insight.full_analysis if insight.full_analysis else {
+                'transcript_summary': insight.transcript_summary,
+                'key_insights': insight.key_insights,
+                'conviction_factors': insight.conviction_factors,
+                'overall_score': insight.overall_score,
+                'sentiment': insight.sentiment,
+                'revenue_growth': insight.revenue_growth,
+                'margin_trend': insight.margin_trend,
+                'order_book_strength': insight.order_book_strength,
+                'analysis_date': insight.analysis_date.strftime('%Y-%m-%d %H:%M')
+            }
             return jsonify({
                 'success': True,
                 'symbol': symbol,
-                'analysis': {
-                    'transcript_summary': insight.transcript_summary,
-                    'key_insights': insight.key_insights,
-                    'conviction_factors': insight.conviction_factors,
-                    'overall_score': insight.overall_score,
-                    'sentiment': insight.sentiment,
-                    'revenue_growth': insight.revenue_growth,
-                    'margin_trend': insight.margin_trend,
-                    'order_book_strength': insight.order_book_strength,
-                    'analysis_date': insight.analysis_date.strftime('%Y-%m-%d %H:%M')
-                }
+                'analysis': analysis
             })
         else:
             return jsonify({'success': False, 'error': 'No analysis found'}), 404

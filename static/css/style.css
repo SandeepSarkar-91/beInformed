@@ -452,6 +452,26 @@ body {
     font-weight: 700;
 }
 
+.analysis-quarter {
+    font-size: 1rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-top: var(--spacing-xs);
+}
+
+.cached-note {
+    font-size: 0.8rem;
+    color: var(--info-solid);
+    font-weight: 400;
+    margin-left: var(--spacing-sm);
+    font-style: italic;
+}
+
+.gain-stable {
+    color: #ffc107;
+    font-weight: 600;
+}
+
 .conviction-score {
     text-align: center;
 }
@@ -712,4 +732,303 @@ body {
 .btn-sm {
     padding: 0.5rem 1rem;
     font-size: 0.9rem;
+}
+
+/* ============= RESEARCH REPORT ============= */
+
+.research-report {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+/* Hero header */
+.rr-hero {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 1.5rem 2rem;
+    backdrop-filter: blur(10px);
+}
+
+.rr-hero-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    flex-wrap: wrap;
+}
+
+.rr-symbol {
+    font-size: 2rem;
+    font-weight: 800;
+    background: linear-gradient(135deg, var(--primary), var(--secondary));
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin: 0;
+}
+
+.rr-quarter {
+    background: var(--bg-secondary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.rr-verdict {
+    padding: 0.35rem 1rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #fff;
+}
+
+.rr-hero-scores {
+    display: flex;
+    gap: 1.5rem;
+}
+
+.rr-score-card {
+    text-align: center;
+    background: var(--bg-secondary);
+    padding: 0.75rem 1.25rem;
+    border-radius: 12px;
+    min-width: 80px;
+}
+
+.rr-score-value {
+    font-size: 2rem;
+    font-weight: 800;
+    line-height: 1;
+}
+
+.rr-score-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+/* Conclusion box */
+.rr-conclusion {
+    background: rgba(102, 126, 234, 0.08);
+    border-left: 4px solid var(--primary);
+    padding: 1rem 1.25rem;
+    border-radius: 0 8px 8px 0;
+    font-size: 0.95rem;
+    color: var(--text-secondary);
+    line-height: 1.6;
+}
+
+.rr-conclusion p {
+    margin: 0;
+}
+
+/* Collapsible sections */
+.rr-section {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: all 0.2s ease;
+}
+
+.rr-section[open] {
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+}
+
+.rr-section-header {
+    padding: 1rem 1.25rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    transition: background 0.2s ease;
+    list-style: none;
+    user-select: none;
+}
+
+.rr-section-header::-webkit-details-marker {
+    display: none;
+}
+
+.rr-section-header::after {
+    content: '▸';
+    margin-left: auto;
+    transition: transform 0.2s ease;
+    color: var(--text-secondary);
+}
+
+.rr-section[open]>.rr-section-header::after {
+    transform: rotate(90deg);
+}
+
+.rr-section-header:hover {
+    background: var(--bg-card-hover);
+}
+
+.rr-section-body {
+    padding: 0 1.25rem 1.25rem;
+    animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Lists */
+.rr-list {
+    list-style: none;
+    padding: 0;
+    margin: 0.5rem 0;
+}
+
+.rr-list li {
+    padding: 0.5rem 0.75rem;
+    margin-bottom: 0.35rem;
+    background: var(--bg-secondary);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    line-height: 1.5;
+    color: var(--text-secondary);
+    border-left: 3px solid var(--primary);
+}
+
+.rr-empty {
+    color: var(--text-secondary);
+    font-style: italic;
+    font-size: 0.85rem;
+    opacity: 0.6;
+    padding: 0.5rem 0;
+}
+
+/* Metrics grid */
+.rr-metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.rr-metric {
+    background: var(--bg-secondary);
+    padding: 0.75rem;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.rr-metric-label {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.rr-metric-value {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+/* Tags */
+.rr-meta-row {
+    display: flex;
+    gap: 0.75rem;
+    margin-bottom: 0.75rem;
+    flex-wrap: wrap;
+}
+
+.rr-tag {
+    background: var(--bg-secondary);
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.rr-tag-expanding {
+    color: #4facfe;
+}
+
+.rr-tag-contracting {
+    color: #fa709a;
+}
+
+.rr-tag-stable {
+    color: #fee140;
+}
+
+/* Section sub-headers */
+.rr-section-body h4 {
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin: 1.25rem 0 0.5rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 1px solid var(--border-color);
+}
+
+/* Score badge */
+.rr-score-badge {
+    display: inline-block;
+    padding: 0.35rem 1rem;
+    border-radius: 20px;
+    font-size: 1.1rem;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 0.5rem;
+}
+
+/* Conviction detail grid */
+.rr-conviction-detail {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+}
+
+.rr-conv-card {
+    background: var(--bg-secondary);
+    padding: 1rem 1.25rem;
+    border-radius: 12px;
+}
+
+.rr-conv-card h4 {
+    margin: 0 0 0.5rem;
+    border-bottom: none;
+    font-size: 0.95rem;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .rr-hero {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+    }
+
+    .rr-conviction-detail {
+        grid-template-columns: 1fr;
+    }
+
+    .rr-metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
