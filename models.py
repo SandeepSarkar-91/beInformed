@@ -101,6 +101,22 @@ def get_database_url():
     return os.getenv('DATABASE_URL', 'postgresql://localhost/beInformed')
 
 
+class AnnualReportAnalysis(Base):
+    """Store deep-dive annual report analysis"""
+    __tablename__ = 'annual_report_analysis'
+    
+    id = Column(Integer, primary_key=True)
+    symbol = Column(String(50), nullable=False)
+    fiscal_year = Column(String(20))
+    analysis_date = Column(DateTime, default=datetime.now, nullable=False)
+    analysis_data = Column(JSON)  # Stores all 8 sections + snapshots + conviction table
+    overall_score = Column(Float)  # 1-10
+    verdict = Column(Text)
+    
+    def __repr__(self):
+        return f"<AnnualReportAnalysis {self.symbol} FY: {self.fiscal_year} Score: {self.overall_score}>"
+
+
 def init_db():
     """Initialize database and create all tables"""
     engine = create_engine(get_database_url(), echo=True)

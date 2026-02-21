@@ -1,4 +1,4 @@
-from models import TradeCall, TradePerformance, MarketIndicators, ConvictionInsights, get_session
+from models import TradeCall, TradePerformance, MarketIndicators, ConvictionInsights, AnnualReportAnalysis, get_session
 from datetime import datetime, timedelta
 from sqlalchemy import func, desc
 
@@ -108,6 +108,23 @@ class DatabaseManager:
             actual_exit_price=exit_price,
             status='CLOSED'
         )
+
+    def get_active_trades(self):
+        """Get all trades that are not CLOSED or CANCELLED across all dates"""
+        from sqlalchemy import or_
+        from models import TradePerformance
+        
+        # Returns TradeCalls that:
+        # 1. Have no performance record (default OPEN)
+        # 2. Have a performance record with status 'OPEN'
+        return self.session.query(TradeCall).outerjoin(
+            TradePerformance, TradeCall.id == TradePerformance.trade_call_id
+        ).filter(
+            or_(
+                TradePerformance.id == None,
+                TradePerformance.status == 'OPEN'
+            )
+        ).all()
     
     def get_performance_summary(self, date=None):
         """Get performance summary for a date (default: today)"""
@@ -263,6 +280,45 @@ class DatabaseManager:
         from sqlalchemy import desc
         return self.session.query(ConvictionInsights).order_by(
             desc(ConvictionInsights.analysis_date)
+        ).limit(limit).all()
+
+    # Annual Report operations
+    def save_annual_report_analysis(self, symbol, fiscal_year, analysis_data, overall_score, verdict):
+        """Save annual report analysis"""
+        analysis = AnnualReportAnalysis(
+            symbol=symbol,
+            fiscal_year=fiscal_year,
+            analysis_data=analysis_data,
+            overall_score=overall_score,
+            verdict=verdict
+        )
+        self.session.add(analysis)
+        self.session.commit()
+        return analysis
+
+    def get_latest_annual_report_analysis(self, symbol):
+        """Get latest annual report analysis for a symbol"""
+        return self.session.query(AnnualReportAnalysis).filter_by(
+            symbol=symbol
+        ).order_by(desc(AnnualReportAnalysis.analysis_date)).first()
+
+    def get_annual_report_by_fy(self, symbol, fiscal_year):
+        """Get analysis for specific symbol and FY"""
+        return self.session.query(AnnualReportAnalysis).filter_by(
+            symbol=symbol,
+            fiscal_year=fiscal_year
+        ).first()
+
+    def get_transcript_history(self, limit=10):
+        """Get recent transcript analyses"""
+        return self.session.query(ConvictionInsights).order_by(
+            desc(ConvictionInsights.analysis_date)
+        ).limit(limit).all()
+
+    def get_annual_report_history(self, limit=10):
+        """Get recent annual report analyses"""
+        return self.session.query(AnnualReportAnalysis).order_by(
+            desc(AnnualReportAnalysis.analysis_date)
         ).limit(limit).all()
 
     def close(self):

@@ -1016,6 +1016,319 @@ body {
     font-size: 0.95rem;
 }
 
+/* Annual Report Tab Specifics */
+.rr-verdict-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem 1.5rem;
+    text-align: center;
+    margin-bottom: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+}
+
+.verdict-label {
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    letter-spacing: 0.1em;
+}
+
+.verdict-value {
+    font-size: 1.5rem;
+    font-weight: 800;
+}
+
+.rr-snapshot-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1rem;
+    margin-bottom: 1rem;
+}
+
+.snapshot-card {
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.snap-title {
+    font-size: 0.85rem;
+    font-weight: 800;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.snapshot-card.strength {
+    border-top: 4px solid #4facfe;
+}
+
+.snapshot-card.concern {
+    border-top: 4px solid #fa709a;
+}
+
+.snapshot-card.watch {
+    border-top: 4px solid #fee140;
+}
+
+.snapshot-card .rr-list li {
+    background: transparent;
+    padding: 0;
+    font-size: 0.85rem;
+    border-left: none;
+    margin-bottom: 0.25rem;
+    display: flex;
+    gap: 0.5rem;
+}
+
+.snapshot-card .rr-list li::before {
+    content: '•';
+    color: var(--primary);
+}
+
+/* Conviction Table */
+.conviction-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+}
+
+.conviction-table th,
+.conviction-table td {
+    padding: 0.75rem;
+    text-align: left;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.conviction-table th {
+    color: var(--text-secondary);
+    font-weight: 600;
+}
+
+.score-pill {
+    display: inline-block;
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-weight: 800;
+    color: #fff;
+    min-width: 32px;
+    text-align: center;
+}
+
+.score-pill.high {
+    background: linear-gradient(135deg, #4facfe, #00f2fe);
+}
+
+.score-pill.mid {
+    background: linear-gradient(135deg, #f6d365, #fda085);
+}
+
+.score-pill.low {
+    background: linear-gradient(135deg, #fa709a, #fee140);
+}
+
+/* History UI Styles */
+.analysis-layout {
+    display: flex;
+    gap: 1.5rem;
+    align-items: flex-start;
+}
+
+.analysis-main {
+    flex: 1;
+    min-width: 0;
+}
+
+.analysis-history {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 1.25rem;
+    height: calc(100vh - 200px);
+    overflow-y: auto;
+    position: sticky;
+    top: 100px;
+}
+
+/* Live Tracker UI */
+.live-tracker-container {
+    margin-top: 2.5rem;
+    padding: 1.5rem;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    border-left: 4px solid var(--accent-primary);
+}
+
+.live-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+}
+
+.live-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.live-title h3 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.live-badge {
+    background: #ff4d4f;
+    color: white;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 2px 8px;
+    border-radius: 4px;
+    letter-spacing: 0.05em;
+    animation: pulse-red 2s infinite;
+}
+
+@keyframes pulse-red {
+    0% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 77, 79, 0.7);
+    }
+
+    70% {
+        transform: scale(1);
+        box-shadow: 0 0 0 6px rgba(255, 77, 79, 0);
+    }
+
+    100% {
+        transform: scale(0.95);
+        box-shadow: 0 0 0 0 rgba(255, 77, 79, 0);
+    }
+}
+
+.section-desc {
+    color: var(--text-secondary);
+    font-size: 0.9rem;
+    margin-bottom: 1.5rem;
+}
+
+.live-table {
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.live-table th {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.price-up {
+    color: var(--success);
+    font-weight: 600;
+}
+
+.price-down {
+    color: var(--danger);
+    font-weight: 600;
+}
+
+.target-sl-group {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.8rem;
+    gap: 2px;
+}
+
+.ts-tag {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ts-label {
+    font-weight: 700;
+    opacity: 0.6;
+}
+
+.analysis-history h3 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+}
+
+.history-item {
+    background: var(--bg-secondary);
+    padding: 0.85rem;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: 1px solid transparent;
+}
+
+.history-item:hover {
+    background: var(--bg-card-hover);
+    border-color: var(--primary);
+    transform: translateX(4px);
+}
+
+.hist-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.25rem;
+}
+
+.hist-symbol {
+    font-weight: 800;
+    color: var(--text-primary);
+    font-size: 0.95rem;
+}
+
+.hist-score {
+    font-size: 0.8rem;
+    font-weight: 700;
+    padding: 0.1rem 0.5rem;
+    border-radius: 8px;
+    background: var(--bg-card);
+}
+
+.hist-period {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+}
+
+.hist-date {
+    font-size: 0.7rem;
+    color: var(--text-secondary);
+    opacity: 0.6;
+    margin-top: 0.35rem;
+}
+
+@media (max-width: 1024px) {
+    .analysis-layout {
+        flex-direction: column;
+    }
+
+    .analysis-history {
+        width: 100%;
+        position: static;
+    }
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .rr-hero {

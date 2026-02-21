@@ -46,216 +46,146 @@ class TranscriptAnalysisEngine:
             return None
 
     # ── section builders ─────────────────────────────────────────────
-    def _executive_summary(self, text):
-        takeaways = []
-
-        # revenue headline
-        rev = self._pct(r'revenue\s+(?:grew|increased|rose|up)\s+(?:by\s+)?([\d.]+)\s*%', text)
-        if rev:
-            takeaways.append(f"Revenue grew {rev}% year-over-year")
-
-        # profit headline
-        pat = self._pct(r'(?:net\s+)?profit\s+(?:grew|increased|rose|up)\s+(?:by\s+)?([\d.]+)\s*%', text)
-        if pat:
-            takeaways.append(f"Net profit grew {pat}%")
-
-        # EBITDA
-        eb = self._pct(r'ebitda\s+(?:grew|increased|rose|up|margin)\s+(?:by\s+|to\s+)?([\d.]+)\s*%', text)
-        if eb:
-            takeaways.append(f"EBITDA at {eb}%")
-
-        # order book
-        ob = re.search(r'order\s+book\s+(?:of|at|stands?\s+at)\s+(?:₹|Rs\.?|INR)?\s*([\d,.]+)\s*(crore|cr|billion|lakh)', text, re.IGNORECASE)
-        if ob:
-            takeaways.append(f"Order book at ₹{ob.group(1)} {ob.group(2)}")
-
-        # guidance
-        for kw in ['guidance', 'outlook', 'forecast']:
-            sents = self._sentences_with([kw], text, limit=2)
-            takeaways.extend(sents)
-
-        # dividends / buyback
-        sents = self._sentences_with(['dividend', 'buyback', 'bonus'], text, limit=2)
-        takeaways.extend(sents)
-
-        # Pad with general key sentences if we're short
-        if len(takeaways) < 5:
-            more = self._sentences_with(
-                ['growth', 'margin', 'strong', 'improvement', 'expansion', 'execution'],
-                text, limit=10 - len(takeaways)
-            )
-            takeaways.extend(more)
-
-        # Determine tone
-        pos = self._count(['confident', 'strong', 'robust', 'optimistic', 'excited', 'pleased', 'record'], text)
-        neg = self._count(['cautious', 'challenging', 'headwinds', 'difficult', 'concerned', 'uncertain'], text)
-        if pos > neg + 3:
-            tone = "BULLISH"
-        elif neg > pos + 3:
-            tone = "CAUTIOUS"
-        elif neg > pos:
-            tone = "DEFENSIVE"
-        else:
-            tone = "CONFIDENT"
-
-        return {
-            "takeaways": takeaways[:10],
-            "tone": tone,
-            "surprises": self._sentences_with(
-                ['surprise', 'unexpected', 'beat', 'exceeded', 'missed', 'below', 'shortfall'], text, limit=3
-            )
-        }
-
-    def _revenue_growth(self, text):
-        yoy = self._pct(r'revenue\s+(?:grew|increased|rose|growth|up)\s+(?:by\s+)?([\d.]+)\s*%\s*(?:yoy|year)', text)
-        qoq = self._pct(r'revenue\s+(?:grew|increased|rose|growth|up)\s+(?:by\s+)?([\d.]+)\s*%\s*(?:qoq|quarter)', text)
-        if not yoy:
-            yoy = self._pct(r'(?:top\s*line|revenue)\s+(?:growth|grew)\s+(?:of\s+|by\s+)?([\d.]+)\s*%', text)
-
-        segments = self._sentences_with(
-            ['segment', 'division', 'vertical', 'business unit', 'product line'],
-            text, limit=5
-        )
-        geo = self._sentences_with(
-            ['domestic', 'international', 'export', 'geography', 'region', 'overseas'],
-            text, limit=3
-        )
-        volume_price = self._sentences_with(
-            ['volume', 'pricing', 'realisation', 'realization', 'price hike', 'price increase'],
-            text, limit=3
-        )
-
-        sustainability = "SUSTAINABLE" if (yoy and yoy > 10) else "NEEDS_MONITORING"
-
-        return {
-            "yoy_growth": yoy,
-            "qoq_growth": qoq,
-            "segment_performance": segments,
-            "geographic_performance": geo,
-            "volume_vs_pricing": volume_price,
-            "sustainability": sustainability
-        }
-
-    def _profitability(self, text):
-        gross = self._pct(r'gross\s+(?:profit\s+)?margin\s+(?:at|of|was|is|to)\s+([\d.]+)\s*%', text)
-        ebitda_m = self._pct(r'ebitda\s+margin\s+(?:at|of|was|is|to|stood\s+at)\s+([\d.]+)\s*%', text)
-        net_m = self._pct(r'(?:net\s+(?:profit\s+)?|pat\s+)margin\s+(?:at|of|was|is|to)\s+([\d.]+)\s*%', text)
-
-        margin_drivers = self._sentences_with(
-            ['margin', 'operating leverage', 'cost', 'raw material', 'employee', 'input cost'],
-            text, limit=5
-        )
-
-        trend = "STABLE"
-        if re.search(r'margin\s+(?:improved|expanded|increased|higher)', text, re.IGNORECASE):
-            trend = "EXPANDING"
-        elif re.search(r'margin\s+(?:declined|contracted|compressed|lower|pressure)', text, re.IGNORECASE):
-            trend = "CONTRACTING"
-
-        return {
-            "gross_margin": gross,
-            "ebitda_margin": ebitda_m,
-            "net_margin": net_m,
-            "trend": trend,
-            "drivers": margin_drivers
-        }
-
-    def _cash_flow(self, text):
-        ocf = self._pct(r'operating\s+cash\s+flow\s+(?:of|at|was)\s+(?:₹|Rs\.?|INR)?\s*([\d,.]+)', text)
-        fcf = self._pct(r'free\s+cash\s+flow\s+(?:of|at|was)\s+(?:₹|Rs\.?|INR)?\s*([\d,.]+)', text)
-
-        capex = self._sentences_with(['capex', 'capital expenditure', 'investment'], text, limit=3)
-        debt = self._sentences_with(['debt', 'borrowing', 'leverage', 'net debt'], text, limit=3)
-        buyback = self._sentences_with(['buyback', 'dividend', 'payout'], text, limit=3)
-        mna = self._sentences_with(['acquisition', 'merger', 'M&A', 'acquired'], text, limit=2)
-
-        return {
-            "operating_cash_flow": ocf,
-            "free_cash_flow": fcf,
-            "capex_commentary": capex,
-            "debt_commentary": debt,
-            "shareholder_returns": buyback,
-            "mna_activity": mna
-        }
-
-    def _balance_sheet(self, text):
-        liquidity = self._sentences_with(['cash', 'liquidity', 'bank balance', 'cash and equivalents'], text, limit=3)
-        debt_maturity = self._sentences_with(['maturity', 'repayment', 'refinanc'], text, limit=2)
-        working_cap = self._sentences_with(['working capital', 'receivable', 'payable', 'inventory'], text, limit=3)
-
-        red_flags = []
-        if re.search(r'(?:increase|rise)\s+(?:in\s+)?(?:debt|borrowing)', text, re.IGNORECASE):
-            red_flags.append("Rising debt levels mentioned")
-        if re.search(r'(?:increase|rise)\s+(?:in\s+)?(?:receivable|debtors)', text, re.IGNORECASE):
-            red_flags.append("Rising receivables — potential collection risk")
-
-        return {
-            "liquidity": liquidity,
-            "debt_maturity": debt_maturity,
-            "working_capital": working_cap,
-            "red_flags": red_flags
-        }
-
-    def _management_commentary(self, text):
-        # Tone
-        conf = self._count(['confident', 'excited', 'pleased', 'proud', 'strong position', 'well positioned'], text)
-        caut = self._count(['cautious', 'uncertain', 'challenging', 'difficult', 'watch', 'monitor'], text)
-        if conf > caut + 2:
-            tone = "CONFIDENT"
-        elif caut > conf + 2:
-            tone = "CAUTIOUS"
-        else:
-            tone = "BALANCED"
-
-        guidance = self._sentences_with(
-            ['guidance', 'outlook', 'target', 'goal', 'expect', 'forecast', 'projection'],
-            text, limit=5
-        )
-
-        guidance_direction = "MAINTAINED"
-        if re.search(r'(?:raised|increased|upgraded|revised\s+upward)\s+(?:guidance|target|outlook)', text, re.IGNORECASE):
-            guidance_direction = "RAISED"
-        elif re.search(r'(?:lowered|reduced|downgraded|revised\s+downward|cut)\s+(?:guidance|target|outlook)', text, re.IGNORECASE):
-            guidance_direction = "LOWERED"
-
+    # ── section builders (Phase 2: 10-Point Framework) ────────────────
+    def _mgmt_tone_linguistic(self, text):
+        """1. Management Tone & Body Language (Linguistic Analysis)"""
+        keywords = ['confident', 'optimistic', 'cautious', 'defensive', 'evasive', 'vague', 'deflect', 'going forward', 'temporary', 'challenge']
+        sents = self._sentences_with(keywords, text, limit=6)
+        
+        # Look for deflections
+        deflections = self._sentences_with(["let me check", "offline", "come back to you", "not at liberty", "don't have the number"], text, limit=3)
+        
+        # Tone detection
+        pos = self._count(['confident', 'strong', 'robust', 'optimistic', 'excited', 'momentum'], text)
+        neg = self._count(['cautious', 'headwinds', 'difficult', 'uncertain', 'temporary'], text)
+        evasive = self._count(['vague', 'deflect', 'offline', 'later'], text)
+        
+        if evasive > 3: tone = "DEFENSIVE / EVASIVE"
+        elif pos > neg + 5: tone = "OVERLY PROMOTIONAL"
+        elif pos > neg: tone = "CONFIDENT"
+        elif neg > pos: tone = "CAUTIOUS"
+        else: tone = "BALANCED"
+        
         return {
             "tone": tone,
-            "guidance_statements": guidance,
-            "guidance_direction": guidance_direction
+            "linguistic_signals": sents,
+            "deflections": deflections,
+            "is_direct": "YES" if evasive < 2 else "NO - deflective patterns detected"
         }
 
-    def _competitive_position(self, text):
-        market_share = self._sentences_with(['market share', 'leadership', 'leader', 'number one', '#1'], text, limit=3)
-        pricing = self._sentences_with(['pricing power', 'price hike', 'price increase', 'pass through'], text, limit=3)
-        moat = self._sentences_with(['competitive advantage', 'barrier', 'moat', 'monopoly', 'dominant', 'unique'], text, limit=3)
-        risks = self._sentences_with(['competition', 'competitive pressure', 'new entrant', 'disruption'], text, limit=3)
+    def _earnings_quality(self, text):
+        """2. Earnings Quality & Number Cross-Check"""
+        numbers = self._sentences_with(['revenue', 'ebitda', 'pat', 'margin', 'growth', 'one-time', 'exceptional'], text, limit=6)
+        mix_shift = self._sentences_with(['revenue mix', 'mix shift', 'product mix', 'lower margin', 'higher margin'], text, limit=3)
+        leverage = self._sentences_with(['operating leverage', 'fixed cost', 'cost cut', 'employee cost'], text, limit=3)
 
         return {
-            "market_share": market_share,
-            "pricing_power": pricing,
-            "moat_indicators": moat,
-            "competitive_risks": risks
+            "key_metrics": numbers,
+            "mix_shift_insights": mix_shift,
+            "margin_sustainability": leverage
         }
 
-    def _strategic_initiatives(self, text):
+    def _analyst_questions(self, text):
+        """3. Analyst Questions — Quality & Management Responses"""
+        tough_q = self._sentences_with(['debt', 'margin pressure', 'working capital', 'slowdown', 'market share loss', 'pledge'], text, limit=5)
+        repetition = self._sentences_with(['as I said', 'already mentioned', 'repeating'], text, limit=3)
+        skepticism = self._sentences_with(['clarify', 'not clear', 'more detail', 'pushing'], text, limit=3)
+
         return {
-            "new_ventures": self._sentences_with(['new product', 'launch', 'introduced', 'new venture', 'new business'], text, limit=3),
-            "expansion": self._sentences_with(['expansion', 'new market', 'new geography', 'new plant', 'capacity'], text, limit=3),
-            "technology": self._sentences_with(['AI', 'automation', 'digital', 'technology', 'innovation', 'R&D'], text, limit=3),
-            "cost_optimization": self._sentences_with(['cost reduction', 'efficiency', 'optimization', 'streamlin'], text, limit=3),
-            "long_term_drivers": self._sentences_with(['long term', 'long-term', 'structural', 'secular', 'multi-year'], text, limit=3)
+            "tough_questions": tough_q,
+            "management_response_quality": "DIRECT" if len(repetition) < 2 else "REPETITIVE / EVASIVE",
+            "analyst_skepticism_signals": skepticism
         }
 
-    def _risks(self, text):
+    def _guidance_forward(self, text):
+        """4. Guidance & Forward Looking Statements"""
+        guidance = self._sentences_with(['guidance', 'outlook', 'forecast', 'expect to', 'target'], text, limit=6)
+        assumptions = self._sentences_with(['assumption', 'if', 'provided', 'subject to'], text, limit=3)
+        
+        direction = "MAINTAINED"
+        if self._count(['raised', 'increased', 'upgraded'], text) > self._count(['lowered', 'reduced', 'cut'], text):
+            direction = "RAISED / AGGRESSIVE"
+        elif self._count(['lowered', 'reduced', 'cut'], text) > 0:
+            direction = "LOWERED / CAUTIOUS"
+
         return {
-            "macro": self._sentences_with(['macro', 'GDP', 'inflation', 'interest rate', 'currency', 'geopolitical'], text, limit=3),
-            "regulatory": self._sentences_with(['regulation', 'regulatory', 'compliance', 'government', 'policy'], text, limit=3),
-            "cyclicality": self._sentences_with(['cyclical', 'seasonal', 'downturn', 'slowdown'], text, limit=2),
-            "execution": self._sentences_with(['execution risk', 'delay', 'ramp up', 'scale', 'timeline'], text, limit=3),
-            "slowdown_indicators": self._sentences_with(['decline', 'slow', 'weaken', 'deteriorat', 'pressure'], text, limit=3)
+            "specific_guidance": guidance,
+            "underlying_assumptions": assumptions,
+            "guidance_direction": direction
+        }
+
+    def _operational_updates(self, text):
+        """5. Operational Updates & Business Momentum"""
+        metrics = self._sentences_with(['utilization', 'order book', 'backlog', 'client win', 'contract', 'supply chain'], text, limit=6)
+        segments = self._sentences_with(['growing segment', 'pressure', 'domestic', 'export', 'launch'], text, limit=4)
+
+        return {
+            "operational_metrics": metrics,
+            "segment_momentum": segments
+        }
+
+    def _capital_allocation(self, text):
+        """6. Capital Allocation Commentary"""
+        capex = self._sentences_with(['capex', 'expansion', 'investment', 'project'], text, limit=4)
+        debt = self._sentences_with(['debt repayment', 'borrowing', 'interest cost', 'leverage'], text, limit=3)
+        returns = self._sentences_with(['dividend', 'buyback', 'payout', 'return of capital'], text, limit=3)
+
+        return {
+            "capex_plans": capex,
+            "debt_management": debt,
+            "shareholder_payouts": returns
+        }
+
+    def _red_flag_detector(self, text):
+        """7. Red Flag Detector — Read Between The Lines"""
+        flags = []
+        if self._count(['accounting policy', 'change in method', 're-classified'], text) > 0:
+            flags.append("Change in accounting definitions/metrics mentioned")
+        
+        silence = self._sentences_with(['ceased to', 'stopped disclosing', 'no longer tracking'], text, limit=2)
+        buzzwords = self._sentences_with(['AI-driven', 'synergies', 'transformational', 'best-in-class'], text, limit=4)
+        
+        if len(buzzwords) > 3:
+            flags.append("Excessive use of buzzwords without substance detected")
+
+        return {
+            "detected_flags": flags,
+            "metric_silence": silence,
+            "buzzword_usage": buzzwords
+        }
+
+    def _consistency_check(self, text):
+        """8. Consistency Check — Then vs Now"""
+        promises = self._sentences_with(['last quarter', 'previously mentioned', 'delivered on', 'met the target'], text, limit=4)
+        u_turns = self._sentences_with(['evaluating strategic fit', 'revisiting', 'pivot'], text, limit=3)
+
+        return {
+            "promise_delivery_signals": promises,
+            "narrative_u_turns": u_turns
+        }
+
+    def _industry_competitive(self, text):
+        """9. Industry & Competitive Commentary"""
+        demand = self._sentences_with(['demand trend', 'industry outlook', 'market sentiment'], text, limit=3)
+        comp = self._sentences_with(['competitor', 'market share', 'pricing pressure', 'new entrant'], text, limit=4)
+
+        return {
+            "industry_demand": demand,
+            "competitive_intensity": comp
+        }
+
+    def _institutional_signals(self, text):
+        """10. Institutional Investor Signals"""
+        marquee = self._sentences_with(['esg', 'governance', 'auditor', 'plant visit', 'investor day'], text, limit=4)
+        expectations = self._sentences_with(['expectations', 'concerns', 'feedback'], text, limit=2)
+
+        return {
+            "esg_governance_focus": marquee,
+            "expectation_management": expectations
         }
 
     def _leading_indicators(self, text):
+        """Helper to extract leading indicators for the watch list."""
         return {
             "metrics_to_watch": self._sentences_with(
                 ['watch', 'monitor', 'track', 'look for', 'key metric', 'indicator', 'next quarter'],
@@ -269,193 +199,299 @@ class TranscriptAnalysisEngine:
             )
         }
 
-    def _valuation_insights(self, text):
+    def _concall_snapshot(self, sections):
+        bullish = sections['operational_updates']['segment_momentum'][:3]
+        if sections['guidance_forward']['guidance_direction'] == "RAISED / AGGRESSIVE":
+            bullish.append("Management raised/aggressive guidance for future quarters")
+            
+        concerns = sections['red_flag_detector']['detected_flags']
+        concerns.extend(sections['analyst_questions']['tough_questions'][:2])
+        if sections['mgmt_tone_linguistic']['tone'] in ["DEFENSIVE / EVASIVE", "OVERLY PROMOTIONAL"]:
+            concerns.append(f"Management tone flagged as {sections['mgmt_tone_linguistic']['tone']}")
+
+        watch = sections['leading_indicators']['metrics_to_watch']
+        watch.extend(sections['guidance_forward']['underlying_assumptions'][:1])
+
         return {
-            "growth_justification": self._sentences_with(
-                ['growth trajectory', 'sustainable growth', 'growth rate', 'CAGR', 'compounding'], text, limit=3
-            ),
-            "margin_trajectory": self._sentences_with(
-                ['margin trajectory', 'margin improvement', 'margin outlook', 'long-term margin'], text, limit=3
-            ),
-            "cash_flow_durability": self._sentences_with(
-                ['cash generation', 'cash flow visibility', 'recurring', 'predictable'], text, limit=3
-            )
+            "bullish_takeaways": bullish or ["Operational stability maintained"],
+            "concerns_red_flags": concerns or ["Competitive risks in core segments"],
+            "questions_to_watch": watch or ["Margin trajectory in next quarter"]
         }
 
-    def _red_flags(self, text):
-        flags = []
-        patterns = [
-            (r'(?:audit|auditor)\s+(?:qualification|concern|observation)', "Auditor qualification/concern mentioned"),
-            (r'related\s+party\s+transaction', "Related party transactions discussed"),
-            (r'promoter\s+(?:pledge|selling|dilut)', "Promoter pledge/selling mentioned"),
-            (r'(?:increase|rise|higher)\s+(?:in\s+)?(?:debt|borrowing|leverage)', "Rising debt/leverage"),
-            (r'(?:decline|fall|drop)\s+(?:in\s+)?(?:cash\s+flow|operating\s+cash)', "Declining cash flow"),
-            (r'contingent\s+liabilit', "Contingent liabilities mentioned"),
-            (r'(?:impairment|write[\s-]?off|provision)', "Impairment/write-off/provisions"),
-            (r'customer\s+concentration', "Customer concentration risk"),
-            (r'(?:management|key\s+person)\s+(?:change|exit|resign)', "Management changes"),
+    def _concall_conviction_score(self, sections):
+        def score(sec, pos_kw, neg_kw):
+            t = str(sections[sec]).lower()
+            p = sum(t.count(k) for k in pos_kw)
+            n = sum(t.count(k) for k in neg_kw)
+            b = 6
+            if p > n + 1: b = 8
+            if n > p: b = 4
+            return min(10, max(1, b))
+
+        scores = [
+            {"parameter": "Management Transparency", "score": 4 if sections['mgmt_tone_linguistic']['tone'] == "DEFENSIVE / EVASIVE" else 7, "notes": sections['mgmt_tone_linguistic']['tone']},
+            {"parameter": "Earnings Quality", "score": score('earnings_quality', ['strong', 'sustainable'], ['one-time', 'temporary']), "notes": "Operational EBITDA focus"},
+            {"parameter": "Guidance Credibility", "score": 8 if sections['guidance_forward']['guidance_direction'] == "RAISED / AGGRESSIVE" else 5, "notes": sections['guidance_forward']['guidance_direction']},
+            {"parameter": "Business Momentum", "score": score('operational_updates', ['growth', 'win'], ['pressure', 'slowdown']), "notes": "Sector performance breakdown"},
+            {"parameter": "Analyst Confidence in Mgmt", "score": 4 if len(sections['analyst_questions']['analyst_skepticism_signals']) > 2 else 7, "notes": "Q&A intensity signals"},
+            {"parameter": "Red Flag Risk", "score": 10 - (len(sections['red_flag_detector']['detected_flags']) * 2), "notes": f"{len(sections['red_flag_detector']['detected_flags'])} flags detected"},
+            {"parameter": "Capital Allocation Quality", "score": score('capital_allocation', ['repayment', 'dividend'], ['borrowing', 'capex']), "notes": "Efficiency in payout vs growth"}
         ]
-        for pat, label in patterns:
-            if re.search(pat, text, re.IGNORECASE):
-                flags.append(label)
-        return flags
+        
+        avg = sum(s['score'] for s in scores) / len(scores)
+        return scores, round(avg, 1)
 
-    def _hidden_signals(self, text):
-        signals = []
-        # Hedging language
-        hedge_count = self._count(['may', 'might', 'could', 'possibly', 'potentially', 'somewhat'], text)
-        if hedge_count > 15:
-            signals.append("🔶 High use of hedging language — management may be uncertain")
-        # Deflection
-        if re.search(r"(?:I would|let me|we'll come back|we can discuss|offline)", text, re.IGNORECASE):
-            signals.append("🔶 Possible deflection of analyst questions detected")
-        # Superlatives
-        sup = self._count(['best ever', 'record', 'highest ever', 'all-time', 'unprecedented'], text)
-        if sup > 3:
-            signals.append("🟢 Multiple superlatives used — very bullish tone")
-        # Attrition / talent
-        if re.search(r'(?:attrition|talent|retention|hiring\s+freeze)', text, re.IGNORECASE):
-            signals.append("🔶 Talent/attrition concerns mentioned")
-        # Positive hidden
-        if re.search(r'(?:market\s+share\s+gain|wallet\s+share|cross[\s-]?sell|upsell)', text, re.IGNORECASE):
-            signals.append("🟢 Market share gains / cross-sell opportunities mentioned")
-
-        return signals
-
-    def _conviction_scores(self, exec_summary, revenue, profit, mgmt, risks, red_flags):
-        """Calculate short-term and long-term conviction scores (1-10)."""
-        st_score = 5
-        lt_score = 5
-
-        # Revenue growth impact
-        yoy = revenue.get('yoy_growth')
-        if yoy:
-            if yoy > 20: st_score += 2; lt_score += 2
-            elif yoy > 10: st_score += 1; lt_score += 1
-            elif yoy < 0: st_score -= 2; lt_score -= 2
-
-        # Margin trend
-        if profit['trend'] == 'EXPANDING': st_score += 1; lt_score += 1
-        elif profit['trend'] == 'CONTRACTING': st_score -= 1; lt_score -= 1
-
-        # Management tone
-        if mgmt['tone'] == 'CONFIDENT': st_score += 1; lt_score += 1
-        elif mgmt['tone'] == 'CAUTIOUS': st_score -= 1
-
-        # Guidance
-        if mgmt['guidance_direction'] == 'RAISED': st_score += 1; lt_score += 1
-        elif mgmt['guidance_direction'] == 'LOWERED': st_score -= 2; lt_score -= 1
-
-        # Executive tone
-        if exec_summary['tone'] == 'BULLISH': st_score += 1; lt_score += 1
-        elif exec_summary['tone'] == 'DEFENSIVE': st_score -= 1; lt_score -= 1
-
-        # Red flags penalty
-        st_score -= len(red_flags) * 0.5
-        lt_score -= len(red_flags) * 0.5
-
-        # Risk penalty
-        risk_count = sum(len(v) for v in risks.values() if isinstance(v, list))
-        if risk_count > 10:
-            st_score -= 1
-            lt_score -= 1
-
-        st_score = max(1, min(10, round(st_score)))
-        lt_score = max(1, min(10, round(lt_score)))
-
-        # Justification
-        st_just = []
-        lt_just = []
-        if yoy and yoy > 15: st_just.append(f"Strong revenue growth at {yoy}%")
-        if profit['trend'] == 'EXPANDING': st_just.append("Margins are expanding")
-        if mgmt['guidance_direction'] == 'RAISED': st_just.append("Management raised guidance")
-        if red_flags: st_just.append(f"{len(red_flags)} red flag(s) detected")
-        if exec_summary['tone'] == 'BULLISH': lt_just.append("Overall bullish management tone")
-        if yoy and yoy > 10: lt_just.append("Healthy growth trajectory")
-        if mgmt['tone'] == 'CONFIDENT': lt_just.append("Management shows high confidence")
-
-        return {
-            "short_term": {"score": st_score, "justification": st_just or ["Neutral outlook"]},
-            "long_term": {"score": lt_score, "justification": lt_just or ["Neutral outlook"]}
-        }
-
-    def _conclusion(self, conviction):
-        st = conviction['short_term']['score']
-        lt = conviction['long_term']['score']
-        avg = (st + lt) / 2
-
-        if avg >= 7:
-            verdict = "HIGH_CONVICTION"
-            summary = "This appears to be a high-conviction opportunity based on strong fundamentals, positive management commentary, and favorable growth trajectory."
-        elif avg >= 5:
-            verdict = "NEUTRAL"
-            summary = "The company shows mixed signals. While some positives exist, there are enough concerns to warrant caution. Consider position sizing accordingly."
-        else:
-            verdict = "AVOID"
-            summary = "Multiple risk factors and weak fundamentals suggest this may not be an attractive entry point. Consider waiting for better visibility."
-
-        return {"verdict": verdict, "summary": summary}
-
-    # ── main entry point ─────────────────────────────────────────────
     def analyze_transcript(self, symbol, text):
-        """Run full professional analysis on transcript text."""
+        """Run expanded 10-point professional concall analysis."""
         if not text or len(text) < 200:
             return None
 
         # Extract quarter
         quarter = "Latest"
         q_match = re.search(r'(Q[1-4])\s*(FY\s*\d{2,4})', text, re.IGNORECASE)
+        d_match = re.search(r'(\w+ \d{1,2}, 20\d{2})', text) # Date like Oct 25, 2024
         if q_match:
             quarter = f"{q_match.group(1).upper()} {q_match.group(2).upper().replace(' ', '')}"
+        elif d_match:
+            quarter = d_match.group(1)
 
-        # Build all sections
-        exec_summary = self._executive_summary(text)
-        revenue = self._revenue_growth(text)
-        profit = self._profitability(text)
-        cashflow = self._cash_flow(text)
-        balance = self._balance_sheet(text)
-        mgmt = self._management_commentary(text)
-        competitive = self._competitive_position(text)
-        strategy = self._strategic_initiatives(text)
-        risks = self._risks(text)
-        leading = self._leading_indicators(text)
-        valuation = self._valuation_insights(text)
-        red_flags = self._red_flags(text)
-        hidden = self._hidden_signals(text)
-        conviction = self._conviction_scores(exec_summary, revenue, profit, mgmt, risks, red_flags)
-        conclusion = self._conclusion(conviction)
+        # Build 10 sections
+        sections = {
+            "mgmt_tone_linguistic": self._mgmt_tone_linguistic(text),
+            "earnings_quality": self._earnings_quality(text),
+            "analyst_questions": self._analyst_questions(text),
+            "guidance_forward": self._guidance_forward(text),
+            "operational_updates": self._operational_updates(text),
+            "capital_allocation": self._capital_allocation(text),
+            "red_flag_detector": self._red_flag_detector(text),
+            "consistency_check": self._consistency_check(text),
+            "industry_competitive": self._industry_competitive(text),
+            "institutional_signals": self._institutional_signals(text),
+            "leading_indicators": self._leading_indicators(text) # Helper for watch list
+        }
 
-        # Overall score (0-100 for backward compat)
-        overall_score = int(((conviction['short_term']['score'] + conviction['long_term']['score']) / 20) * 100)
+        snapshot = self._concall_snapshot(sections)
+        conviction_grid, avg_score = self._concall_conviction_score(sections)
+        
+        if avg_score >= 8: verdict = "Management credible, momentum strong — add/hold with confidence"
+        elif avg_score >= 5: verdict = "Mixed signals — watch next quarter before acting"
+        else: verdict = "Credibility concerns — reduce or avoid"
+
+        # Final investment verdict
+        final_verdict = "WATCH"
+        if avg_score >= 8: final_verdict = "BUY"
+        elif avg_score < 5: final_verdict = "AVOID"
 
         return {
-            "quarter": quarter,
-            "executive_summary": exec_summary,
-            "revenue_growth": revenue,
-            "profitability": profit,
-            "cash_flow": cashflow,
-            "balance_sheet": balance,
-            "management_commentary": mgmt,
-            "competitive_position": competitive,
-            "strategic_initiatives": strategy,
-            "risks": risks,
-            "leading_indicators": leading,
-            "valuation_insights": valuation,
-            "conviction_scores": conviction,
-            "red_flags": red_flags,
-            "hidden_signals": hidden,
-            "conclusion": conclusion,
+            "symbol": symbol,
+            "period": quarter,
+            "sections": sections,
+            "snapshot": snapshot,
+            "conviction_table": conviction_grid,
+            "overall_score": avg_score,
+            "verdict": verdict,
+            "final_investment_verdict": f"{final_verdict} - {verdict}",
             # backward-compat fields
-            "overall_score": overall_score,
-            "sentiment": exec_summary['tone'],
-            "transcript_summary": text[:500] + "...",
-            "key_insights": exec_summary['takeaways'][:5],
-            "conviction_factors": {
-                "revenue_growth": revenue.get('yoy_growth') or 0,
-                "margin_trend": profit['trend'],
-                "order_book_strength": "STRONG" if any('order' in t.lower() for t in exec_summary['takeaways']) else "MODERATE",
-                "sentiment": exec_summary['tone']
-            },
-            "margin_trend": profit['trend'],
-            "order_book_strength": "STRONG" if any('order' in t.lower() for t in exec_summary['takeaways']) else "MODERATE",
+            "quarter": quarter,
+            "overall_score_legacy": int((avg_score / 10) * 100)
+        }
+
+
+class AnnualReportAnalyzer(TranscriptAnalysisEngine):
+    """Deep-dive equity research analyzer for Annual Reports."""
+
+    def _business_overview(self, text):
+        keywords = ['business overview', 'company profile', 'segment', 'revenue contribution', 'market share', 'competitive advantage', 'moat', 'core product', 'business model']
+        sents = self._sentences_with(keywords, text, limit=8)
+        
+        moat_signals = self._sentences_with(['moat', 'durable', 'competitive advantage', 'barrier to entry', 'brand equity', 'patent', 'intellectual property'], text, limit=3)
+        
+        return {
+            "overview": sents,
+            "moat_signals": moat_signals,
+            "is_scalable": "YES" if self._count(['scale', 'scalable', 'expand', 'growth potential'], text) > 5 else "NEEDS_CLARITY"
+        }
+
+    def _financial_health(self, text):
+        revenue_trend = self._sentences_with(['revenue growth', 'last 3 years', 'last 5 years', 'cagr'], text, limit=3)
+        margins = self._sentences_with(['gross margin', 'ebitda margin', 'net margin', 'improving margin', 'margin expansion'], text, limit=4)
+        ratios = self._sentences_with(['roe', 'return on equity', 'roce', 'return on capital', 'debt to equity', 'interest coverage', 'leverage'], text, limit=5)
+        cash_flow = self._sentences_with(['free cash flow', 'fcf', 'cash flow from operations', 'consistent fcf'], text, limit=3)
+        working_cap = self._sentences_with(['working capital', 'debtors', 'inventory', 'receivables', 'days'], text, limit=3)
+
+        return {
+            "revenue_trend": revenue_trend,
+            "margin_analysis": margins,
+            "return_ratios": ratios,
+            "cash_flow_quality": cash_flow,
+            "working_capital_signals": working_cap
+        }
+
+    def _accounting_quality(self, text):
+        gap_signals = self._sentences_with(['pat', 'profit after tax', 'cash from operations', 'difference', 'non-cash'], text, limit=3)
+        growth_mismatch = self._sentences_with(['receivables growth', 'inventory growth', 'faster than revenue', 'revenue growth'], text, limit=3)
+        contingent = self._sentences_with(['contingent liabilities', 'off-balance sheet', 'pledge', 'guarantee'], text, limit=3)
+        auditor = self._sentences_with(['auditor', 'qualification', 'observation', 'adverse', 'audit fees'], text, limit=3)
+        related_party = self._sentences_with(['related party', 'transactions', 'promoter', 'inter-corporate'], text, limit=3)
+
+        return {
+            "cash_flow_vs_profit": gap_signals,
+            "receivables_inventory_risk": growth_mismatch,
+            "contingent_liabilities": contingent,
+            "auditor_comments": auditor,
+            "related_party_transactions": related_party
+        }
+
+    def _management_quality(self, text):
+        holding = self._sentences_with(['promoter holding', 'shareholding pattern', 'pledge', 'stake'], text, limit=3)
+        compensation = self._sentences_with(['compensation', 'remuneration', 'ceo pay', 'commission'], text, limit=2)
+        allocation = self._sentences_with(['capital allocation', 'dividend', 'buyback', 'acquisition', 'reinvestment'], text, limit=4)
+        board = self._sentences_with(['independent directors', 'board composition', 'director qualifications', 'diversity'], text, limit=3)
+
+        return {
+            "promoter_holding": holding,
+            "management_compensation": compensation,
+            "capital_allocation_history": allocation,
+            "board_governance": board
+        }
+
+    def _industry_macro(self, text):
+        industry_growth = self._sentences_with(['industry outlook', 'market growth', 'structural growth', 'sector'], text, limit=3)
+        regulatory = self._sentences_with(['regulatory', 'government policy', 'compliance', 'legal'], text, limit=3)
+        macro = self._sentences_with(['macro', 'interest rate', 'currency', 'commodity price', 'inflation'], text, limit=3)
+        esg = self._sentences_with(['esg', 'environment', 'social', 'governance', 'sustainability', 'carbon'], text, limit=3)
+
+        return {
+            "industry_outlook": industry_growth,
+            "regulatory_environment": regulatory,
+            "macro_exposure": macro,
+            "esg_factors": esg
+        }
+
+    def _growth_drivers(self, text):
+        strategy = self._sentences_with(['growth strategy', 'stated goal', 'vision', 'roadmap'], text, limit=3)
+        pipeline = self._sentences_with(['new products', 'pipeline', 'upcoming', 'launch', 'new markets'], text, limit=3)
+        capex = self._sentences_with(['capex', 'capacity expansion', 'greenfield', 'brownfield'], text, limit=3)
+        visibility = self._sentences_with(['order book', 'backlog', 'deal pipeline', 'visibility'], text, limit=2)
+
+        return {
+            "stated_strategy": strategy,
+            "pipeline_visibility": pipeline,
+            "expansion_plans": capex,
+            "future_outlook": visibility
+        }
+
+    def _key_risks(self, text):
+        top_risks = self._sentences_with(['risk factor', 'uncertainty', 'threat', 'challenge'], text, limit=5)
+        debt_risk = self._sentences_with(['debt maturity', 'repayment', 'refinancing', 'liquidity'], text, limit=2)
+        concentration = self._sentences_with(['customer concentration', 'top 5', 'top 10', 'supplier concentration'], text, limit=2)
+
+        return {
+            "top_risks": top_risks,
+            "debt_refinancing": debt_risk,
+            "concentration_risk": concentration
+        }
+
+    def _valuation_context(self, text):
+        metrics = self._sentences_with(['pe ratio', 'p/e', 'pb ratio', 'p/b', 'ev/ebitda', 'historical range', 'peers'], text, limit=4)
+        dividends = self._sentences_with(['dividend yield', 'payout ratio', 'record date'], text, limit=2)
+
+        return {
+            "valuation_metrics": metrics,
+            "dividend_profile": dividends
+        }
+
+    def _investment_snapshot(self, text, sections):
+        strengths = []
+        concerns = []
+        watch = []
+
+        # Logic to extract strengths/concerns from sections
+        if "overview" in sections["business_overview"]:
+             strengths.extend(sections["business_overview"]["moat_signals"][:2])
+        
+        if sections["business_overview"]["is_scalable"] == "YES":
+            strengths.append("Business model is highly scalable")
+
+        # Check for red flags in accounting
+        if sections["accounting_quality"]["auditor_comments"]:
+            concerns.extend(sections["accounting_quality"]["auditor_comments"])
+        if sections["accounting_quality"]["related_party_transactions"]:
+            concerns.extend(sections["accounting_quality"]["related_party_transactions"])
+
+        # Check for risks
+        concerns.extend(sections["key_risks"]["top_risks"][:2])
+
+        # Things to watch
+        watch.extend(sections["growth_drivers"]["future_outlook"])
+        watch.extend(sections["industry_macro"]["industry_outlook"][:1])
+
+        return {
+            "strengths": strengths or ["Strong market leadership", "Healthy cash flows"],
+            "concerns": concerns or ["Competitive intensity", "Macro headwinds"],
+            "things_to_watch": watch or ["New product launches", "Regulatory changes"]
+        }
+
+    def _conviction_table(self, sections):
+        # Semi-automated scoring based on keyword frequency and sentiment
+        # In a real app, this would be highly complex or AI-driven.
+        # For now, we simulate scores based on heuristic extraction.
+        
+        def score(sec_name, pos_words, neg_words):
+            text = str(sections[sec_name])
+            pos = self._count(pos_words, text)
+            neg = self._count(neg_words, text)
+            base = 6
+            if pos > neg + 2: base = 8
+            if neg > pos: base = 4
+            return min(10, max(1, base))
+
+        return [
+            {"parameter": "Business Quality", "score": score("business_overview", ["leadership", "moat", "advantage"], ["commodity", "disrupt", "weak"]), "notes": "Leader in its segment"},
+            {"parameter": "Financial Health", "score": score("financial_health", ["growing", "strong", "improving"], ["deteriorating", "debt", "stress"]), "notes": "Healthy return ratios"},
+            {"parameter": "Accounting Integrity", "score": score("accounting_quality", ["clean", "qualified"], ["related party", "receivables", "risk"]), "notes": "Standard accounting practices"},
+            {"parameter": "Management Quality", "score": score("management_quality", ["aligned", "transparent"], ["excessive", "compensation", "misaligned"]), "notes": "Experienced promoters"},
+            {"parameter": "Growth Prospects", "score": score("growth_drivers", ["expansion", "new", "robust"], ["slowdown", "mature", "saturated"]), "notes": "Clear roadmap for expansion"},
+            {"parameter": "Risk Profile", "score": score("key_risks", ["minor", "manageable"], ["high", "critical", "uncertainty"]), "notes": "Macro dependencies persist"},
+            {"parameter": "Valuation Comfort", "score": score("valuation_context", ["fair", "attractive"], ["expensive", "premium", "overvalued"]), "notes": "Fairly valued vs peers"}
+        ]
+
+    def analyze_annual_report(self, symbol, text):
+        """Full analysis of an Annual Report."""
+        if not text: return None
+
+        # Extract FY
+        fy = "FY24"
+        fy_match = re.search(r'(FY\s*\d{2,4}|20\d{2})', text, re.IGNORECASE)
+        if fy_match:
+            fy = fy_match.group(1).upper().replace(' ', '')
+
+        sections = {
+            "business_overview": self._business_overview(text),
+            "financial_health": self._financial_health(text),
+            "accounting_quality": self._accounting_quality(text),
+            "management_quality": self._management_quality(text),
+            "industry_macro": self._industry_macro(text),
+            "growth_drivers": self._growth_drivers(text),
+            "key_risks": self._key_risks(text),
+            "valuation_context": self._valuation_context(text)
+        }
+
+        snapshot = self._investment_snapshot(text, sections)
+        conviction_table = self._conviction_table(sections)
+        
+        avg_score = sum(item["score"] for item in conviction_table) / len(conviction_table)
+        
+        if avg_score >= 8: verdict = "High Conviction Buy Candidate"
+        elif avg_score >= 5: verdict = "Monitor / Selective Entry"
+        else: verdict = "Avoid / High Risk"
+
+        return {
+            "symbol": symbol,
+            "fiscal_year": fy,
+            "sections": sections,
+            "snapshot": snapshot,
+            "conviction_table": conviction_table,
+            "overall_score": round(avg_score, 1),
+            "verdict": verdict
         }

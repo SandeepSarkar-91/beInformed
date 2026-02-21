@@ -4,7 +4,7 @@ from mock_data import MockDataGenerator
 from market_data import MarketDataManager
 from analyzer import TradingAnalyzer
 from context_parser import ContextParser
-from transcripts import TranscriptAnalysisEngine
+from transcripts import TranscriptAnalysisEngine, AnnualReportAnalyzer
 from datetime import datetime
 import os
 from dotenv import load_dotenv
@@ -336,6 +336,56 @@ def get_performance_summary():
 
 # ============= TAB 3: CONVICTION ANALYSIS =============
 
+@app.route('/api/active_trades', methods=['GET'])
+def get_active_trades():
+    """Get all OPEN trades with their live current prices"""
+    try:
+        db = DatabaseManager()
+        market_data = MarketDataManager()
+        active_trades = db.get_active_trades()
+        db.close()
+        
+        results = []
+        for trade in active_trades:
+            try:
+                current_price = market_data.get_stock_price(trade.symbol)
+                gain_loss_percent = ((current_price - trade.entry_price) / trade.entry_price) * 100
+                gain_loss_amount = current_price - trade.entry_price
+                
+                results.append({
+                    'id': trade.id,
+                    'symbol': trade.symbol,
+                    'entry_price': trade.entry_price,
+                    'current_price': current_price,
+                    'target_price': trade.target_price,
+                    'stop_loss': trade.stop_loss,
+                    'call_date': trade.call_date.strftime('%Y-%m-%d %H:%M'),
+                    'gain_loss_percent': round(gain_loss_percent, 2),
+                    'gain_loss_amount': round(gain_loss_amount, 2),
+                    'recommendation': trade.recommendation
+                })
+            except Exception as e:
+                # If price fetch fails, still include the trade but with null live data
+                results.append({
+                    'id': trade.id,
+                    'symbol': trade.symbol,
+                    'entry_price': trade.entry_price,
+                    'current_price': None,
+                    'target_price': trade.target_price,
+                    'stop_loss': trade.stop_loss,
+                    'call_date': trade.call_date.strftime('%Y-%m-%d %H:%M'),
+                    'gain_loss_percent': 0,
+                    'gain_loss_amount': 0,
+                    'recommendation': trade.recommendation,
+                    'error': str(e)
+                })
+        
+        return jsonify({'success': True, 'active_trades': results})
+        
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @app.route('/api/analyze_transcript', methods=['POST'])
 def analyze_transcript():
     """Analyze a stock for conviction insights using uploaded PDF transcript"""
@@ -376,7 +426,6 @@ def analyze_transcript():
         
         # Save new analysis
         insight = db.save_conviction_insights(
-            symbol=symbol,
             **analysis_data
         )
         db.close()
@@ -422,6 +471,119 @@ def get_conviction(symbol):
         else:
             return jsonify({'success': False, 'error': 'No analysis found'}), 404
             
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/analyze_annual_report', methods=['POST'])
+def analyze_annual_report():
+    """Analyze a stock annual report PDF"""
+    try:
+        symbol = request.form.get('symbol', '').upper()
+        if not symbol:
+            return jsonify({'success': False, 'error': "Symbol is required"}), 400
+            
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': "No file provided"}), 400
+            
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'success': False, 'error': "No file selected"}), 400
+            
+        db = DatabaseManager()
+        analyzer = AnnualReportAnalyzer()
+        
+        # Extract text
+        text = analyzer.extract_text(file)
+        if not text:
+            db.close()
+            return jsonify({'success': False, 'error': "Failed to extract text from PDF"}), 500
+            
+        # Analyze
+        analysis_data = analyzer.analyze_annual_report(symbol, text)
+        if not analysis_data:
+            db.close()
+            return jsonify({'success': False, 'error': "Failed to analyze annual report"}), 500
+            
+        # Save to DB
+        db.save_annual_report_analysis(
+            symbol=symbol,
+            fiscal_year=analysis_data['fiscal_year'],
+            analysis_data=analysis_data,
+            overall_score=analysis_data['overall_score'],
+            verdict=analysis_data['verdict']
+        )
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'symbol': symbol,
+            'analysis': analysis_data
+        })
+        
+    except Exception as e:
+        if 'db' in locals(): db.close()
+        print(f"Error in analyze_annual_report: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/annual_report/<symbol>', methods=['GET'])
+def get_annual_report(symbol):
+    """Get latest annual report analysis"""
+    try:
+        db = DatabaseManager()
+        insight = db.get_latest_annual_report_analysis(symbol.upper())
+        db.close()
+        
+        if insight:
+            return jsonify({
+                'success': True,
+                'symbol': symbol,
+                'analysis': insight.analysis_data
+            })
+        else:
+            return jsonify({'success': False, 'error': 'No analysis found'}), 404
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/api/history/transcripts', methods=['GET'])
+def get_transcript_history():
+    """Get list of recent transcript analyses"""
+    try:
+        db = DatabaseManager()
+        history = db.get_transcript_history()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'history': [{
+                'symbol': h.symbol,
+                'period': h.quarter,
+                'score': h.overall_score,
+                'date': h.analysis_date.strftime('%Y-%m-%d')
+            } for h in history]
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/history/annual_reports', methods=['GET'])
+def get_ar_history():
+    """Get list of recent annual report analyses"""
+    try:
+        db = DatabaseManager()
+        history = db.get_annual_report_history()
+        db.close()
+        
+        return jsonify({
+            'success': True,
+            'history': [{
+                'symbol': h.symbol,
+                'fy': h.fiscal_year,
+                'score': h.overall_score,
+                'date': h.analysis_date.strftime('%Y-%m-%d')
+            } for h in history]
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

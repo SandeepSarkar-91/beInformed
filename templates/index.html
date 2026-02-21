@@ -29,6 +29,9 @@
             <button class="tab-btn" data-tab="tab3">
                 🔍 Conviction Analysis
             </button>
+            <button class="tab-btn" data-tab="tab4">
+                📜 Annual Report
+            </button>
         </nav>
 
         <!-- Tab Content -->
@@ -165,29 +168,107 @@
                         </thead>
                         <tbody id="tradesTableBody">
                             <tr>
-                                <td colspan="8" class="empty-state">No trades for selected date</td>
+                                <td colspan="8" class="empty-state">Select a date to view historical trades</td>
                             </tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Live Active Tracker -->
+                <div class="live-tracker-container">
+                    <div class="live-header">
+                        <div class="live-title">
+                            <h3>🛰️ Live Call Tracker</h3>
+                            <span class="live-badge">LIVE</span>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" id="refreshActiveBtn">🔄 Refresh Prices</button>
+                    </div>
+                    <p class="section-desc">Track real-time performance of all open calls across all dates.</p>
+
+                    <div class="table-container">
+                        <table class="trades-table live-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th>Call Date</th>
+                                    <th>Entry Price</th>
+                                    <th>Current Price</th>
+                                    <th>Target/SL</th>
+                                    <th>Live Gain/Loss %</th>
+                                    <th>PnL</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="activeTradesTableBody">
+                                <tr>
+                                    <td colspan="8" class="empty-state">No active calls being tracked</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
             <!-- Tab 3: Conviction Analysis -->
             <div id="tab3" class="tab-content">
-                <div class="tab-header">
-                    <h2>Stock Conviction Analysis</h2>
-                    <div class="search-container">
-                        <input type="text" id="symbolInput" placeholder="Enter stock symbol (e.g., ITC)"
-                            class="search-input">
-                        <input type="file" id="transcriptFile" accept=".pdf" class="file-input" style="display: none;">
-                        <button class="btn btn-secondary" id="uploadBtn">📎 Upload Transcript</button>
-                        <button class="btn btn-primary" id="analyzeBtn">🔍 Analyze</button>
+                <div class="analysis-layout">
+                    <div class="analysis-main">
+                        <div class="tab-header">
+                            <h2>Stock Conviction Analysis</h2>
+                            <div class="search-container">
+                                <input type="text" id="symbolInput" placeholder="Enter stock symbol (e.g., ITC)"
+                                    class="search-input">
+                                <input type="file" id="transcriptFile" accept=".pdf" class="file-input"
+                                    style="display: none;">
+                                <button class="btn btn-secondary" id="uploadBtn">📎 Upload Transcript</button>
+                                <button class="btn btn-primary" id="analyzeBtn">🔍 Analyze</button>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Results -->
+                        <div class="analysis-container" id="analysisContainer">
+                            <p class="empty-state">Enter a stock symbol and click "Analyze" to get conviction insights
+                            </p>
+                        </div>
+                    </div>
+
+                    <div class="analysis-history">
+                        <h3>🕒 Recent Analyses</h3>
+                        <div id="transcriptHistoryList" class="history-list">
+                            <p class="empty-state">No recent reports</p>
+                        </div>
                     </div>
                 </div>
+            </div>
 
-                <!-- Analysis Results -->
-                <div class="analysis-container" id="analysisContainer">
-                    <p class="empty-state">Enter a stock symbol and click "Analyze" to get conviction insights</p>
+            <!-- Tab 4: Annual Report -->
+            <div id="tab4" class="tab-content">
+                <div class="analysis-layout">
+                    <div class="analysis-main">
+                        <div class="tab-header">
+                            <h2>Annual Report Deep-Dive</h2>
+                            <div class="search-container">
+                                <input type="text" id="arSymbolInput" placeholder="Enter stock symbol"
+                                    class="search-input">
+                                <input type="file" id="annualReportFile" accept=".pdf" class="file-input"
+                                    style="display: none;">
+                                <button class="btn btn-secondary" id="arUploadBtn">📎 Upload Annual Report</button>
+                                <button class="btn btn-primary" id="arAnalyzeBtn">📝 Deep Analysis</button>
+                            </div>
+                        </div>
+
+                        <!-- Analysis Results -->
+                        <div class="analysis-container" id="arAnalysisContainer">
+                            <p class="empty-state">Upload an annual report and start deep-dive analysis</p>
+                        </div>
+                    </div>
+
+                    <div class="analysis-history">
+                        <h3>🕒 Recent Deep-Dives</h3>
+                        <div id="arHistoryList" class="history-list">
+                            <p class="empty-state">No recent reports</p>
+                        </div>
+                    </div>
                 </div>
             </div>
         </main>
